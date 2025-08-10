@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useGameStore } from '../stores/gameStore';
 import { GameBoard } from './GameBoard';
-import { checkWinCondition } from '../lib/calculations';
+import { Celebration } from './Celebration';
+import { checkWinCondition, shuffleItems } from '../lib/calculations';
 
 export function GamePlayer() {
   const navigate = useNavigate();
@@ -12,13 +13,20 @@ export function GamePlayer() {
     playerState, 
     loadGame, 
     joinGame, 
-    markItem, 
-    clearMarkedItems 
+    markPosition, 
+    clearMarkedPositions 
   } = useGameStore();
   const [displayName, setDisplayName] = useState('');
   const [isJoining, setIsJoining] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Deterministic shuffle - always call this hook, even if we don't use the result yet
+  const shuffledItems = useMemo(() => {
+    if (!currentGame || !playerState) return [];
+    const seed = `${currentGame.gameCode}-${playerState.displayName}`;
+    return shuffleItems(currentGame.items, seed);
+  }, [currentGame, playerState]);
   
   useEffect(() => {
     const initGame = async () => {
@@ -142,14 +150,11 @@ export function GamePlayer() {
     );
   }
   
-  const hasWon = checkWinCondition(
-    playerState.markedItems,
+  const hasWon = playerState ? checkWinCondition(
+    playerState.markedPositions,
     currentGame.settings.gridSize,
     currentGame.settings.requireFullCard
-  );
-  
-  // Shuffle items for this player (deterministic based on player name and game code)
-  const shuffledItems = [...currentGame.items].sort(() => Math.random() - 0.5);
+  ) : false;
   
   return (
     <div className="min-h-screen bg-gray-100 py-8">
@@ -160,28 +165,24 @@ export function GamePlayer() {
           <p className="text-sm text-gray-500">Code: <span className="font-mono">{code}</span></p>
         </div>
         
-        {hasWon && (
-          <div className="bg-green-100 border-2 border-green-500 text-green-800 p-4 rounded-lg mb-6 max-w-lg mx-auto text-center animate-pulse">
-            <p className="text-2xl font-bold">BINGO! You Won!</p>
-          </div>
-        )}
+        {hasWon && <Celebration />}
         
         <GameBoard
           items={shuffledItems}
-          markedItems={playerState.markedItems}
+          markedPositions={playerState.markedPositions}
           gridSize={currentGame.settings.gridSize}
-          onItemClick={markItem}
+          onItemClick={markPosition}
         />
         
         <div className="flex justify-center mt-6 space-x-4">
           <button
-            onClick={clearMarkedItems}
+            onClick={clearMarkedPositions}
             className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 active:scale-95 transition-all"
           >
             Clear Board
           </button>
           <div className="text-gray-600 py-2">
-            Marked: {playerState.markedItems.length} / {currentGame.items.length}
+            Marked: {playerState.markedPositions.length} / {currentGame.items.length}
           </div>
         </div>
       </div>

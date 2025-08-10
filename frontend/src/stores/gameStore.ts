@@ -27,8 +27,8 @@ interface GameStore {
   
   // Player actions
   joinGame: (gameCode: string, displayName: string) => Promise<void>;
-  markItem: (itemId: string) => void;
-  clearMarkedItems: () => void;
+  markPosition: (position: number) => void;
+  clearMarkedPositions: () => void;
   
   // Initialize store
   initialize: () => Promise<void>;
@@ -143,7 +143,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const playerState: PlayerState = {
       gameCode,
       displayName,
-      markedItems: [],
+      markedPositions: [],
       lastSyncAt: Date.now(),
     };
     
@@ -155,15 +155,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
     });
   },
   
-  markItem: (itemId) => {
+  markPosition: (position) => {
     set(produce(draft => {
       if (!draft.playerState) return;
       
-      const marked = draft.playerState.markedItems;
-      if (marked.includes(itemId)) {
-        draft.playerState.markedItems = marked.filter((id: string) => id !== itemId);
+      const marked = draft.playerState.markedPositions;
+      if (marked.includes(position)) {
+        draft.playerState.markedPositions = marked.filter((pos: number) => pos !== position);
       } else {
-        draft.playerState.markedItems = [...marked, itemId];
+        draft.playerState.markedPositions = [...marked, position];
       }
       
       draft.playerState.lastSyncAt = Date.now();
@@ -176,10 +176,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
   },
   
-  clearMarkedItems: () => {
+  clearMarkedPositions: () => {
     set(produce(draft => {
       if (!draft.playerState) return;
-      draft.playerState.markedItems = [];
+      draft.playerState.markedPositions = [];
       draft.playerState.lastSyncAt = Date.now();
     }));
     

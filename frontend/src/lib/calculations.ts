@@ -14,20 +14,20 @@ export function generateAdminToken(): string {
 }
 
 export function checkWinCondition(
-  markedItems: readonly string[],
+  markedPositions: readonly number[],
   gridSize: number,
   requireFullCard: boolean
 ): boolean {
   if (requireFullCard) {
-    return markedItems.length === gridSize * gridSize;
+    return markedPositions.length === gridSize * gridSize;
   }
   // Check rows, columns, and diagonals
-  return checkLines(markedItems, gridSize);
+  return checkLines(markedPositions, gridSize);
 }
 
-function checkLines(markedPositions: readonly string[], size: number): boolean {
-  // Convert item IDs to positions (assuming IDs are position-based for now)
-  const positions = new Set(markedPositions.map(id => parseInt(id)));
+function checkLines(markedPositions: readonly number[], size: number): boolean {
+  // Work directly with positions
+  const positions = new Set(markedPositions);
   
   // Check rows
   for (let row = 0; row < size; row++) {
@@ -74,6 +74,34 @@ function checkLines(markedPositions: readonly string[], size: number): boolean {
   if (diagonal2Complete) return true;
   
   return false;
+}
+
+// Seeded random number generator for deterministic shuffling
+function seededRandom(seed: string): () => number {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    const char = seed.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  
+  return function() {
+    hash = (hash * 1103515245 + 12345) & 0x7fffffff;
+    return hash / 0x7fffffff;
+  };
+}
+
+// Deterministic shuffle based on seed
+export function shuffleItems<T>(items: readonly T[], seed: string): T[] {
+  const shuffled = [...items];
+  const random = seededRandom(seed);
+  
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  
+  return shuffled;
 }
 
 // Generate dummy items for testing

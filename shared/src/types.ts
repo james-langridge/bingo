@@ -25,7 +25,7 @@ export interface GameSettings {
 export interface PlayerState {
   readonly gameCode: string;
   readonly displayName: string;
-  readonly markedItems: readonly string[];  // Item IDs
+  readonly markedPositions: readonly number[];  // Grid positions (0-24 for 5x5)
   readonly lastSyncAt: number;
 }
 
