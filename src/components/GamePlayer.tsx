@@ -56,11 +56,18 @@ export function GamePlayer() {
 
   // Check for new winner
   useEffect(() => {
-    if (currentGame?.winner && !playerState?.hasWon) {
-      setShowWinnerNotification(true);
-      setTimeout(() => setShowWinnerNotification(false), 10000); // Show for 10 seconds
+    if (currentGame?.winner) {
+      // Show notification if someone else won
+      if (currentGame.winner.displayName !== playerState?.displayName) {
+        setShowWinnerNotification(true);
+        setTimeout(() => setShowWinnerNotification(false), 10000); // Show for 10 seconds
+      }
     }
-  }, [currentGame?.winner, playerState?.hasWon]);
+  }, [
+    currentGame?.winner?.wonAt,
+    currentGame?.winner?.displayName,
+    playerState?.displayName,
+  ]);
 
   // Cleanup polling on unmount
   useEffect(() => {

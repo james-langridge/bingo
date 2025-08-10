@@ -317,7 +317,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
       currentGame.settings.requireFullCard,
     );
 
+    console.log("[Multiplayer] Checking for win:", {
+      hasWon,
+      markedPositions: playerState.markedPositions,
+      gridSize: currentGame.settings.gridSize,
+      requireFullCard: currentGame.settings.requireFullCard,
+    });
+
     if (hasWon) {
+      console.log("[Multiplayer] Player has won! Announcing win...");
       // Update player state
       const updatedPlayerState: PlayerState = {
         ...playerState,
@@ -342,6 +350,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       winType: currentGame.settings.requireFullCard ? "fullCard" : "line",
     };
 
+    console.log("[Multiplayer] Announcing win:", winner);
+
     // Update player's hasWon status in players list
     const updatedPlayers = currentGame.players.map((p) =>
       p.id === currentPlayerId
@@ -357,6 +367,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     };
 
     await saveGameLocal(updatedGame);
+    console.log("[Multiplayer] Game updated with winner, syncing to Redis...");
+
     set({
       currentGame: updatedGame,
       playerState: { ...playerState, hasWon: true },
@@ -395,10 +407,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
       // Fetch latest game state from server/Redis
       const latestGame = await loadGameByCode(currentGame.gameCode);
 
-      if (
-        latestGame &&
-        latestGame.lastModifiedAt > currentGame.lastModifiedAt
-      ) {
+      if (latestGame) {
+        // Check if there's a new winner
+        if (latestGame.winner && !currentGame.winner) {
+          console.log("[Multiplayer] New winner detected:", latestGame.winner);
+        }
+
         // Mark currently active players (optional enhancement)
         const now = Date.now();
         const onlineThreshold = 10000; // Consider "online" if seen in last 10 seconds
@@ -416,6 +430,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           players: updatedPlayers,
         };
 
+        // Update the entire game state including winner
         set({ currentGame: updatedGame });
       }
     } catch (error) {
