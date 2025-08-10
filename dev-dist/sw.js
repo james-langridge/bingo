@@ -22,7 +22,7 @@ if (!self.define) {
   const singleRequire = (uri, parentUri) => {
     uri = new URL(uri + ".js", parentUri).href;
     return registry[uri] || (
-      
+
         new Promise(resolve => {
           if ("document" in self) {
             const script = document.createElement("script");
@@ -35,7 +35,7 @@ if (!self.define) {
             resolve();
           }
         })
-      
+
       .then(() => {
         let promise = registry[uri];
         if (!promise) {
@@ -67,7 +67,7 @@ if (!self.define) {
     });
   };
 }
-define(['./workbox-ce4f0d5f'], (function (workbox) { 'use strict';
+define(['./workbox-ce4f0d5f.js'], (function (workbox) { 'use strict';
 
   self.skipWaiting();
   workbox.clientsClaim();

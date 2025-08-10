@@ -1,14 +1,14 @@
 import { create } from 'zustand';
 import { produce } from 'immer';
-import type { Game, PlayerState, BingoItem } from '../../../shared/src/types';
+import type { Game, PlayerState, BingoItem } from '../types/types.ts';
 import { generateGameCode, generateAdminToken } from '../lib/calculations';
-import { 
-  saveGameLocal, 
-  loadLocalGames, 
+import {
+  saveGameLocal,
+  loadLocalGames,
   loadGameByCode,
   deleteGameLocal,
   savePlayerState,
-  loadPlayerState 
+  loadPlayerState
 } from '../lib/storage';
 
 interface GameStore {
@@ -17,19 +17,19 @@ interface GameStore {
   playerState: PlayerState | null;
   localGames: readonly { id: string; gameCode: string; adminToken?: string; title: string }[];
   isLoading: boolean;
-  
+
   // Actions (thin layer over calculations)
   createGame: (title: string) => Promise<Game>;
   loadGame: (gameCode: string) => Promise<void>;
   loadGameAsAdmin: (gameCode: string, adminToken: string) => Promise<void>;
   updateGameItems: (items: BingoItem[]) => Promise<void>;
   deleteGame: (gameId: string) => Promise<void>;
-  
+
   // Player actions
   joinGame: (gameCode: string, displayName: string) => Promise<void>;
   markPosition: (position: number) => void;
   clearMarkedPositions: () => void;
-  
+
   // Initialize store
   initialize: () => Promise<void>;
 }
@@ -39,7 +39,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   playerState: null,
   localGames: [],
   isLoading: false,
-  
+
   createGame: async (title) => {
     const game: Game = {
       id: crypto.randomUUID(),
@@ -51,9 +51,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       createdAt: Date.now(),
       lastModifiedAt: Date.now(),
     };
-    
+
     await saveGameLocal(game);
-    
+
     set(produce(draft => {
       draft.currentGame = game;
       draft.localGames.push({
@@ -63,28 +63,28 @@ export const useGameStore = create<GameStore>((set, get) => ({
         title: game.title,
       });
     }));
-    
+
     return game;
   },
-  
+
   loadGame: async (gameCode) => {
     set({ isLoading: true });
-    
+
     const game = await loadGameByCode(gameCode);
     const playerState = await loadPlayerState(gameCode);
-    
+
     set({
       currentGame: game || null,
       playerState: playerState || null,
       isLoading: false,
     });
   },
-  
+
   loadGameAsAdmin: async (gameCode, adminToken) => {
     set({ isLoading: true });
-    
+
     const game = await loadGameByCode(gameCode);
-    
+
     if (game && game.adminToken === adminToken) {
       set({
         currentGame: game,
@@ -98,19 +98,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
       throw new Error('Invalid admin token');
     }
   },
-  
+
   updateGameItems: async (items) => {
     const { currentGame } = get();
     if (!currentGame) return;
-    
+
     const updatedGame: Game = {
       ...currentGame,
       items,
       lastModifiedAt: Date.now(),
     };
-    
+
     await saveGameLocal(updatedGame);
-    
+
     set(produce(draft => {
       draft.currentGame = updatedGame;
       const gameIndex = draft.localGames.findIndex((g: any) => g.id === updatedGame.id);
@@ -124,10 +124,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
     }));
   },
-  
+
   deleteGame: async (gameId) => {
     await deleteGameLocal(gameId);
-    
+
     set(produce(draft => {
       draft.localGames = draft.localGames.filter((g: any) => g.id !== gameId);
       if (draft.currentGame?.id === gameId) {
@@ -135,64 +135,64 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
     }));
   },
-  
+
   joinGame: async (gameCode, displayName) => {
     const game = await loadGameByCode(gameCode);
     if (!game) throw new Error('Game not found');
-    
+
     const playerState: PlayerState = {
       gameCode,
       displayName,
       markedPositions: [],
       lastSyncAt: Date.now(),
     };
-    
+
     await savePlayerState(playerState);
-    
+
     set({
       currentGame: game,
       playerState,
     });
   },
-  
+
   markPosition: (position) => {
     set(produce(draft => {
       if (!draft.playerState) return;
-      
+
       const marked = draft.playerState.markedPositions;
       if (marked.includes(position)) {
         draft.playerState.markedPositions = marked.filter((pos: number) => pos !== position);
       } else {
         draft.playerState.markedPositions = [...marked, position];
       }
-      
+
       draft.playerState.lastSyncAt = Date.now();
     }));
-    
+
     // Save updated player state
     const { playerState } = get();
     if (playerState) {
       savePlayerState(playerState);
     }
   },
-  
+
   clearMarkedPositions: () => {
     set(produce(draft => {
       if (!draft.playerState) return;
       draft.playerState.markedPositions = [];
       draft.playerState.lastSyncAt = Date.now();
     }));
-    
+
     // Save updated player state
     const { playerState } = get();
     if (playerState) {
       savePlayerState(playerState);
     }
   },
-  
+
   initialize: async () => {
     set({ isLoading: true });
-    
+
     const games = await loadLocalGames();
     const localGames = games.map(game => ({
       id: game.id,
@@ -200,7 +200,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       adminToken: game.adminToken,
       title: game.title,
     }));
-    
+
     set({
       localGames,
       isLoading: false,

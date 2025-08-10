@@ -1,11 +1,11 @@
 import Dexie, { type Table } from 'dexie';
-import type { Game, PlayerState, GameEvent } from '../../../shared/src/types';
+import type { Game, PlayerState, GameEvent } from '../types/types.ts';
 
 class BingoDB extends Dexie {
   games!: Table<Game>;
   playerStates!: Table<PlayerState>;
   pendingEvents!: Table<GameEvent & { id?: number }>;
-  
+
   constructor() {
     super('BingoDB');
     this.version(1).stores({
@@ -53,7 +53,7 @@ export async function queueEvent(event: GameEvent): Promise<void> {
 
 export async function processPendingEvents(): Promise<void> {
   if (!navigator.onLine) return;
-  
+
   const events = await db.pendingEvents.toArray();
   for (const event of events) {
     try {

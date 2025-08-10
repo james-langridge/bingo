@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useGameStore } from '../stores/gameStore';
 import { ShareModal } from './ShareModal';
-import type { BingoItem } from '../../../shared/src/types';
+import type { BingoItem } from '../types/types.ts';
 
 export function GameEditor() {
   const navigate = useNavigate();
@@ -13,7 +13,7 @@ export function GameEditor() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
-  
+
   useEffect(() => {
     const loadGame = async () => {
       if (!code || !token) {
@@ -21,7 +21,7 @@ export function GameEditor() {
         setIsLoading(false);
         return;
       }
-      
+
       try {
         await loadGameAsAdmin(code, token);
         setIsLoading(false);
@@ -30,16 +30,16 @@ export function GameEditor() {
         setIsLoading(false);
       }
     };
-    
+
     loadGame();
   }, [code, token, loadGameAsAdmin]);
-  
+
   useEffect(() => {
     if (currentGame) {
       // Check for template items
       const templateKey = `template_${currentGame.gameCode}`;
       const templateItems = localStorage.getItem(templateKey);
-      
+
       if (templateItems && currentGame.items.length === 0) {
         // Use template items if game has no items yet
         const items = JSON.parse(templateItems);
@@ -55,38 +55,38 @@ export function GameEditor() {
       }
     }
   }, [currentGame]);
-  
+
   const handleAddItem = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newItemText.trim()) return;
-    
+
     const newItem: BingoItem = {
       id: crypto.randomUUID(),
       text: newItemText.trim(),
       position: items.length,
     };
-    
+
     const updatedItems = [...items, newItem];
     setItems(updatedItems);
     setNewItemText('');
   };
-  
+
   const handleRemoveItem = (itemId: string) => {
     const updatedItems = items
       .filter(item => item.id !== itemId)
       .map((item, index) => ({ ...item, position: index }));
     setItems(updatedItems);
   };
-  
+
   const handleSaveItems = async () => {
     await updateGameItems(items);
     alert('Game saved successfully!');
   };
-  
+
   const handleShareGame = () => {
     setShowShareModal(true);
   };
-  
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -94,7 +94,7 @@ export function GameEditor() {
       </div>
     );
   }
-  
+
   if (error) {
     return (
       <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center">
@@ -108,10 +108,10 @@ export function GameEditor() {
       </div>
     );
   }
-  
+
   const gridSize = currentGame?.settings.gridSize || 5;
   const maxItems = gridSize * gridSize;
-  
+
   return (
     <div className="min-h-screen bg-gray-100 py-8">
       <div className="container mx-auto px-4 max-w-4xl">
@@ -137,7 +137,7 @@ export function GameEditor() {
               </button>
             </div>
           </div>
-          
+
           <div className="border-t pt-4">
             <h2 className="text-lg font-semibold mb-2">Add Bingo Items ({items.length}/{maxItems})</h2>
             <form onSubmit={handleAddItem} className="flex gap-2 mb-4">
@@ -157,7 +157,7 @@ export function GameEditor() {
                 Add Item
               </button>
             </form>
-            
+
             {items.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 No items added yet. Start adding items for your bingo game!
@@ -178,7 +178,7 @@ export function GameEditor() {
                 ))}
               </div>
             )}
-            
+
             {items.length > 0 && (
               <button
                 onClick={handleSaveItems}
@@ -189,15 +189,15 @@ export function GameEditor() {
             )}
           </div>
         </div>
-        
+
         <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-4">
           <p className="text-sm">
-            <strong>Tip:</strong> Add {maxItems} items to fill your {gridSize}x{gridSize} grid. 
+            <strong>Tip:</strong> Add {maxItems} items to fill your {gridSize}x{gridSize} grid.
             Players will see these items randomly arranged on their bingo boards.
           </p>
         </div>
       </div>
-      
+
       <ShareModal
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}
