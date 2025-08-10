@@ -54,6 +54,10 @@ export function GamePlayer() {
     initGame();
   }, [code, loadGame]);
 
+  useEffect(() => {
+    console.log({ currentGame });
+  }, [currentGame]);
+
   // Check for new winner
   useEffect(() => {
     if (currentGame?.winner) {
