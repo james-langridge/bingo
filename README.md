@@ -1,4 +1,4 @@
-# Family Bingo
+# Bingo
 
 A Progressive Web Application (PWA) for creating and playing custom bingo games. Built with React, TypeScript, and Vite, featuring offline functionality and zero-authentication gameplay.
 
