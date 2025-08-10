@@ -25,7 +25,7 @@ export function GameEditor() {
       try {
         await loadGameAsAdmin(code, token);
         setIsLoading(false);
-      } catch (err) {
+      } catch {
         setError("Not authorized to edit this game");
         setIsLoading(false);
       }

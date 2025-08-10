@@ -42,7 +42,7 @@ export function GamePlayer() {
       try {
         await loadGame(code);
         setIsLoading(false);
-      } catch (err) {
+      } catch {
         setError("Game not found");
         setIsLoading(false);
       }
@@ -68,7 +68,7 @@ export function GamePlayer() {
     setIsJoining(true);
     try {
       await joinGame(code, displayName.trim());
-    } catch (err) {
+    } catch {
       setError("Failed to join game");
     } finally {
       setIsJoining(false);
