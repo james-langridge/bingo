@@ -1,7 +1,17 @@
 import { create } from "zustand";
 import { produce } from "immer";
-import type { Game, PlayerState, BingoItem } from "../types/types.ts";
-import { generateGameCode, generateAdminToken } from "../lib/calculations";
+import type {
+  Game,
+  PlayerState,
+  BingoItem,
+  Player,
+  WinnerInfo,
+} from "../types/types.ts";
+import {
+  generateGameCode,
+  generateAdminToken,
+  checkWinCondition,
+} from "../lib/calculations";
 import {
   saveGameLocal,
   loadLocalGames,
@@ -22,6 +32,8 @@ interface GameStore {
     title: string;
   }[];
   isLoading: boolean;
+  pollingInterval: number | null;
+  currentPlayerId: string | null;
 
   // Actions (thin layer over calculations)
   createGame: (title: string) => Promise<Game>;
@@ -35,6 +47,14 @@ interface GameStore {
   markPosition: (position: number) => void;
   clearMarkedPositions: () => void;
 
+  // Multiplayer actions
+  updatePlayerActivity: () => Promise<void>;
+  checkForWinner: () => Promise<void>;
+  announceWin: () => Promise<void>;
+  startPolling: () => void;
+  stopPolling: () => void;
+  refreshGameState: () => Promise<void>;
+
   // Initialize store
   initialize: () => Promise<void>;
 }
@@ -44,6 +64,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   playerState: null,
   localGames: [],
   isLoading: false,
+  pollingInterval: null,
+  currentPlayerId: null,
 
   createGame: async (title) => {
     const game: Game = {
@@ -55,6 +77,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       settings: { gridSize: 5, requireFullCard: false, freeSpace: true },
       createdAt: Date.now(),
       lastModifiedAt: Date.now(),
+      players: [], // Initialize empty players array
     };
 
     await saveGameLocal(game);
@@ -85,6 +108,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
       playerState: playerState || null,
       isLoading: false,
     });
+
+    // Start polling if we're in a game
+    if (game && playerState) {
+      get().startPolling();
+    }
   },
 
   loadGameAsAdmin: async (gameCode, adminToken) => {
@@ -153,19 +181,65 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const game = await loadGameByCode(gameCode);
     if (!game) throw new Error("Game not found");
 
-    const playerState: PlayerState = {
-      gameCode,
-      displayName,
-      markedPositions: [],
-      lastSyncAt: Date.now(),
+    // Generate a unique player ID for this session
+    const playerId = crypto.randomUUID();
+    set({ currentPlayerId: playerId });
+
+    // Check if player with same name already exists (returning player)
+    const existingPlayer = game.players.find(
+      (p) => p.displayName === displayName,
+    );
+
+    let updatedPlayers;
+    if (existingPlayer) {
+      // Update existing player's info (they're back!)
+      updatedPlayers = game.players.map((p) =>
+        p.displayName === displayName
+          ? { ...p, id: playerId, lastSeenAt: Date.now(), isOnline: true }
+          : p,
+      );
+    } else {
+      // New player joining for the first time
+      const newPlayer: Player = {
+        id: playerId,
+        displayName,
+        joinedAt: Date.now(),
+        lastSeenAt: Date.now(),
+        hasWon: false,
+        isOnline: true,
+      };
+      updatedPlayers = [...game.players, newPlayer];
+    }
+
+    const updatedGame: Game = {
+      ...game,
+      players: updatedPlayers,
+      lastModifiedAt: Date.now(),
     };
 
-    await savePlayerState(playerState);
+    // Save updated game with new/returning player
+    await saveGameLocal(updatedGame);
+
+    // Create or restore player state
+    let playerState = await loadPlayerState(gameCode);
+    if (!playerState || playerState.displayName !== displayName) {
+      playerState = {
+        gameCode,
+        displayName,
+        markedPositions: [],
+        lastSyncAt: Date.now(),
+        hasWon: existingPlayer?.hasWon || false,
+      };
+      await savePlayerState(playerState);
+    }
 
     set({
-      currentGame: game,
+      currentGame: updatedGame,
       playerState,
     });
+
+    // Start polling for updates
+    get().startPolling();
   },
 
   markPosition: (position) => {
@@ -190,6 +264,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { playerState } = get();
     if (playerState) {
       savePlayerState(playerState);
+      // Check if player has won after marking
+      get().checkForWinner();
     }
   },
 
@@ -206,6 +282,144 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { playerState } = get();
     if (playerState) {
       savePlayerState(playerState);
+    }
+  },
+
+  // Update player's last seen time
+  updatePlayerActivity: async () => {
+    const { currentGame, playerState, currentPlayerId } = get();
+    if (!currentGame || !playerState || !currentPlayerId) return;
+
+    const updatedPlayers = currentGame.players.map((p) =>
+      p.id === currentPlayerId
+        ? { ...p, lastSeenAt: Date.now(), isOnline: true }
+        : p,
+    );
+
+    const updatedGame: Game = {
+      ...currentGame,
+      players: updatedPlayers,
+      lastModifiedAt: Date.now(),
+    };
+
+    await saveGameLocal(updatedGame);
+    set({ currentGame: updatedGame });
+  },
+
+  // Check if current player has won
+  checkForWinner: async () => {
+    const { currentGame, playerState } = get();
+    if (!currentGame || !playerState || playerState.hasWon) return;
+
+    const hasWon = checkWinCondition(
+      playerState.markedPositions,
+      currentGame.settings.gridSize,
+      currentGame.settings.requireFullCard,
+    );
+
+    if (hasWon) {
+      // Update player state
+      const updatedPlayerState: PlayerState = {
+        ...playerState,
+        hasWon: true,
+      };
+      await savePlayerState(updatedPlayerState);
+
+      // Announce the win
+      await get().announceWin();
+    }
+  },
+
+  // Announce that current player has won
+  announceWin: async () => {
+    const { currentGame, playerState, currentPlayerId } = get();
+    if (!currentGame || !playerState || !currentPlayerId) return;
+
+    const winner: WinnerInfo = {
+      playerId: currentPlayerId,
+      displayName: playerState.displayName,
+      wonAt: Date.now(),
+      winType: currentGame.settings.requireFullCard ? "fullCard" : "line",
+    };
+
+    // Update player's hasWon status in players list
+    const updatedPlayers = currentGame.players.map((p) =>
+      p.id === currentPlayerId
+        ? { ...p, hasWon: true, lastSeenAt: Date.now() }
+        : p,
+    );
+
+    const updatedGame: Game = {
+      ...currentGame,
+      players: updatedPlayers,
+      winner,
+      lastModifiedAt: Date.now(),
+    };
+
+    await saveGameLocal(updatedGame);
+    set({
+      currentGame: updatedGame,
+      playerState: { ...playerState, hasWon: true },
+    });
+  },
+
+  // Start polling for game updates
+  startPolling: () => {
+    const { pollingInterval } = get();
+    if (pollingInterval) return; // Already polling
+
+    // Poll every 2 seconds for updates (faster for better UX)
+    const interval = window.setInterval(() => {
+      get().refreshGameState();
+      get().updatePlayerActivity();
+    }, 2000);
+
+    set({ pollingInterval: interval });
+  },
+
+  // Stop polling
+  stopPolling: () => {
+    const { pollingInterval } = get();
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+      set({ pollingInterval: null });
+    }
+  },
+
+  // Refresh game state to get latest updates from Redis
+  refreshGameState: async () => {
+    const { currentGame, currentPlayerId } = get();
+    if (!currentGame) return;
+
+    try {
+      // Fetch latest game state from server/Redis
+      const latestGame = await loadGameByCode(currentGame.gameCode);
+
+      if (
+        latestGame &&
+        latestGame.lastModifiedAt > currentGame.lastModifiedAt
+      ) {
+        // Mark currently active players (optional enhancement)
+        const now = Date.now();
+        const onlineThreshold = 10000; // Consider "online" if seen in last 10 seconds
+
+        const updatedPlayers = latestGame.players.map((p) => ({
+          ...p,
+          isOnline:
+            p.id === currentPlayerId
+              ? true
+              : now - (p.lastSeenAt || 0) < onlineThreshold,
+        }));
+
+        const updatedGame: Game = {
+          ...latestGame,
+          players: updatedPlayers,
+        };
+
+        set({ currentGame: updatedGame });
+      }
+    } catch (error) {
+      console.error("[GameStore] Failed to refresh game state:", error);
     }
   },
 

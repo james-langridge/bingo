@@ -16,13 +16,13 @@ import type { Game, PlayerState, GameEvent } from "../types/types";
 
 // Mock game data
 const mockGame: Game = {
-  id: "game-123",
-  adminToken: "admin123456789012345678901234567",
+  id: "test-id-123",
+  adminToken: "test-admin-token-32chars1234567890ab",
   gameCode: "ABC123",
   title: "Test Game",
   items: [
-    { id: "1", text: "Item 1", position: 0 },
-    { id: "2", text: "Item 2", position: 1 },
+    { id: "item-1", text: "Item 1", position: 0 },
+    { id: "item-2", text: "Item 2", position: 1 },
   ],
   settings: {
     gridSize: 5,
@@ -31,6 +31,7 @@ const mockGame: Game = {
   },
   createdAt: Date.now(),
   lastModifiedAt: Date.now(),
+  players: [],
 };
 
 const mockPlayerState: PlayerState = {

@@ -17,12 +17,15 @@ export function GamePlayer() {
     joinGame,
     markPosition,
     clearMarkedPositions,
+    stopPolling,
+    refreshGameState,
   } = useGameStore();
   const [displayName, setDisplayName] = useState("");
   const [isJoining, setIsJoining] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showWinnerNotification, setShowWinnerNotification] = useState(false);
 
   // Deterministic shuffle - always call this hook, even if we don't use the result yet
   const shuffledItems = useMemo(() => {
@@ -51,12 +54,27 @@ export function GamePlayer() {
     initGame();
   }, [code, loadGame]);
 
+  // Check for new winner
+  useEffect(() => {
+    if (currentGame?.winner && !playerState?.hasWon) {
+      setShowWinnerNotification(true);
+      setTimeout(() => setShowWinnerNotification(false), 10000); // Show for 10 seconds
+    }
+  }, [currentGame?.winner, playerState?.hasWon]);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      stopPolling();
+    };
+  }, [stopPolling]);
+
   const handleRefresh = useCallback(async () => {
     if (!code) return;
     setIsRefreshing(true);
-    await loadGame(code);
+    await refreshGameState();
     setTimeout(() => setIsRefreshing(false), 500);
-  }, [code, loadGame]);
+  }, [code, refreshGameState]);
 
   const { containerRef, isPulling, pullDistance } =
     usePullToRefresh(handleRefresh);
@@ -117,6 +135,40 @@ export function GamePlayer() {
             <p className="text-gray-600 mb-6">
               Game Code: <span className="font-mono font-bold">{code}</span>
             </p>
+
+            {/* Show players list */}
+            {currentGame.players.length > 0 && (
+              <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">
+                  Players already in this game ({currentGame.players.length}):
+                </h3>
+                <div className="space-y-1">
+                  {currentGame.players.map((player) => (
+                    <div
+                      key={player.id}
+                      className="text-sm text-gray-600 flex items-center"
+                    >
+                      • {player.displayName}
+                      {player.hasWon && (
+                        <span className="ml-2 text-green-600 font-semibold">
+                          🏆 Winner!
+                        </span>
+                      )}
+                      {player.isOnline && (
+                        <span
+                          className="ml-2 w-2 h-2 bg-green-500 rounded-full inline-block"
+                          title="Online now"
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Tip: If you played before, use the same name to continue your
+                  game!
+                </p>
+              </div>
+            )}
 
             <form onSubmit={handleJoinGame} className="space-y-4">
               <input
@@ -182,48 +234,132 @@ export function GamePlayer() {
         transition: isPulling ? "none" : "transform 0.3s ease-out",
       }}
     >
-      {(isPulling || isRefreshing) && (
-        <div className="absolute top-0 left-0 right-0 flex justify-center pt-4">
-          <div className="bg-white rounded-full shadow-lg p-3">
-            <div className="animate-spin rounded-full h-6 w-6 border-2 border-purple-500 border-t-transparent"></div>
+      {/* Pull to refresh indicator */}
+      {isPulling && (
+        <div className="absolute top-0 left-0 right-0 flex justify-center pt-2">
+          <div className="bg-white rounded-full p-2 shadow-lg">
+            <svg
+              className="w-6 h-6 text-gray-600 animate-spin"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              />
+            </svg>
           </div>
         </div>
       )}
-      <div className="container mx-auto px-4">
-        <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-800">
-            {currentGame.title}
-          </h1>
-          <p className="text-gray-600">
-            Playing as: <strong>{playerState.displayName}</strong>
-          </p>
-          <p className="text-sm text-gray-500">
-            Code: <span className="font-mono">{code}</span>
-          </p>
-        </div>
 
-        {hasWon && <Celebration />}
-
-        <GameBoard
-          items={shuffledItems}
-          markedPositions={playerState.markedPositions}
-          gridSize={currentGame.settings.gridSize}
-          onItemClick={markPosition}
-        />
-
-        <div className="flex justify-center mt-6 space-x-4">
-          <button
-            onClick={clearMarkedPositions}
-            className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 active:scale-95 transition-all"
-          >
-            Clear Board
-          </button>
-          <div className="text-gray-600 py-2">
-            Marked: {playerState.markedPositions.length} /{" "}
-            {currentGame.items.length}
+      {/* Winner notification banner */}
+      {showWinnerNotification && currentGame.winner && (
+        <div className="fixed top-4 left-4 right-4 z-50 animate-bounce">
+          <div className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white p-4 rounded-lg shadow-lg">
+            <div className="flex items-center justify-center">
+              <span className="text-2xl mr-2">🎉</span>
+              <span className="font-bold text-lg">
+                {currentGame.winner.displayName} has won the game!
+              </span>
+              <span className="text-2xl ml-2">🏆</span>
+            </div>
           </div>
         </div>
+      )}
+
+      {isRefreshing && (
+        <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
+          <div className="text-lg font-semibold">Refreshing...</div>
+        </div>
+      )}
+
+      <div className="container mx-auto px-4 max-w-4xl">
+        <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 mb-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
+            <div>
+              <h1 className="text-2xl font-bold">{currentGame.title}</h1>
+              <p className="text-gray-600">
+                Game Code: <span className="font-mono font-bold">{code}</span>
+              </p>
+              <p className="text-sm text-gray-500">
+                Playing as:{" "}
+                <span className="font-semibold">
+                  {playerState?.displayName}
+                </span>
+              </p>
+            </div>
+            <button
+              onClick={clearMarkedPositions}
+              className="mt-3 sm:mt-0 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+            >
+              Clear Board
+            </button>
+          </div>
+
+          {/* Players list sidebar */}
+          <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-gray-700">
+                Players in Game ({currentGame.players.length})
+              </h3>
+              <span className="text-xs text-gray-500">
+                Updates every 2 seconds
+              </span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+              {currentGame.players.map((player) => (
+                <div
+                  key={player.id}
+                  className={`text-sm px-2 py-1 rounded ${
+                    player.displayName === playerState?.displayName
+                      ? "bg-blue-100 text-blue-700 font-semibold"
+                      : "bg-white text-gray-600"
+                  } ${player.hasWon ? "border-2 border-green-500" : ""}`}
+                >
+                  <div className="flex items-center">
+                    {player.hasWon && <span className="mr-1">🏆</span>}
+                    {player.isOnline && (
+                      <span
+                        className="w-2 h-2 bg-green-500 rounded-full mr-1"
+                        title="Online now"
+                      />
+                    )}
+                    <span className="truncate">{player.displayName}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <GameBoard
+            items={shuffledItems}
+            markedPositions={playerState?.markedPositions || []}
+            onItemClick={markPosition}
+            gridSize={currentGame.settings.gridSize}
+          />
+
+          {currentGame.settings.requireFullCard ? (
+            <p className="text-center text-sm text-gray-600 mt-4">
+              Win condition: Mark all squares
+            </p>
+          ) : (
+            <p className="text-center text-sm text-gray-600 mt-4">
+              Win condition: Complete any row, column, or diagonal
+            </p>
+          )}
+        </div>
       </div>
+
+      {hasWon && <Celebration />}
     </div>
   );
 }
