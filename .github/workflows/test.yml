@@ -29,7 +29,7 @@ jobs:
         run: npm ci
 
       - name: Run type checking
-        run: npm run build -- --noEmit
+        run: npx tsc --noEmit
 
       - name: Run linter
         run: npm run lint
