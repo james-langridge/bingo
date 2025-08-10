@@ -12,7 +12,7 @@ export default defineConfig({
       registerType: 'prompt',
       includeAssets: ['bingo-icon.svg', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Family Bingo',
+        name: 'Bingo',
         short_name: 'Bingo',
         description: 'Create and play custom bingo games with family and friends',
         theme_color: '#8b5cf6',
