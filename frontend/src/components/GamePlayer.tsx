@@ -1,8 +1,10 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useGameStore } from '../stores/gameStore';
 import { GameBoard } from './GameBoard';
 import { Celebration } from './Celebration';
+import { LoadingSkeleton } from './LoadingSkeleton';
+import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { checkWinCondition, shuffleItems } from '../lib/calculations';
 
 export function GamePlayer() {
@@ -20,6 +22,7 @@ export function GamePlayer() {
   const [isJoining, setIsJoining] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Deterministic shuffle - always call this hook, even if we don't use the result yet
   const shuffledItems = useMemo(() => {
@@ -48,6 +51,15 @@ export function GamePlayer() {
     initGame();
   }, [code, loadGame]);
   
+  const handleRefresh = useCallback(async () => {
+    if (!code) return;
+    setIsRefreshing(true);
+    await loadGame(code);
+    setTimeout(() => setIsRefreshing(false), 500);
+  }, [code, loadGame]);
+  
+  const { containerRef, isPulling, pullDistance } = usePullToRefresh(handleRefresh);
+  
   const handleJoinGame = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!displayName.trim() || !code) return;
@@ -63,11 +75,7 @@ export function GamePlayer() {
   };
   
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-xl">Loading game...</div>
-      </div>
-    );
+    return <LoadingSkeleton type="board" />;
   }
   
   if (error) {
@@ -157,7 +165,21 @@ export function GamePlayer() {
   ) : false;
   
   return (
-    <div className="min-h-screen bg-gray-100 py-8">
+    <div 
+      ref={containerRef}
+      className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 py-8 relative"
+      style={{
+        transform: isPulling ? `translateY(${pullDistance}px)` : 'translateY(0)',
+        transition: isPulling ? 'none' : 'transform 0.3s ease-out'
+      }}
+    >
+      {(isPulling || isRefreshing) && (
+        <div className="absolute top-0 left-0 right-0 flex justify-center pt-4">
+          <div className="bg-white rounded-full shadow-lg p-3">
+            <div className="animate-spin rounded-full h-6 w-6 border-2 border-purple-500 border-t-transparent"></div>
+          </div>
+        </div>
+      )}
       <div className="container mx-auto px-4">
         <div className="text-center mb-6">
           <h1 className="text-3xl font-bold text-gray-800">{currentGame.title}</h1>

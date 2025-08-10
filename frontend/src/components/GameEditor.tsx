@@ -36,7 +36,23 @@ export function GameEditor() {
   
   useEffect(() => {
     if (currentGame) {
-      setItems([...currentGame.items]);
+      // Check for template items
+      const templateKey = `template_${currentGame.gameCode}`;
+      const templateItems = localStorage.getItem(templateKey);
+      
+      if (templateItems && currentGame.items.length === 0) {
+        // Use template items if game has no items yet
+        const items = JSON.parse(templateItems);
+        const bingoItems: BingoItem[] = items.slice(0, 25).map((text: string, index: number) => ({
+          id: crypto.randomUUID(),
+          text,
+          position: index
+        }));
+        setItems(bingoItems);
+        localStorage.removeItem(templateKey);
+      } else {
+        setItems([...currentGame.items]);
+      }
     }
   }, [currentGame]);
   

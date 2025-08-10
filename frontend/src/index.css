@@ -1,1 +1,39 @@
 @import "tailwindcss";
+
+/* Prevent double-tap zoom on mobile */
+* {
+  touch-action: manipulation;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent text selection on buttons */
+button {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Better mobile tap targets */
+button, a {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Prevent input zoom on iOS */
+input, textarea, select {
+  font-size: 16px !important;
+}
+
+/* Safe area for notched devices */
+body {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
