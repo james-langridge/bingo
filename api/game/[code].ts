@@ -1,7 +1,12 @@
 import { VercelRequest, VercelResponse } from "@vercel/node";
 import { Redis } from "@upstash/redis";
 
-const redis = Redis.fromEnv();
+// Initialize Redis with environment variables
+// Vercel automatically sets KV_REST_API_URL and KV_REST_API_TOKEN
+const redis = new Redis({
+  url: process.env.KV_REST_API_URL!,
+  token: process.env.KV_REST_API_TOKEN!,
+});
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { code } = req.query;
