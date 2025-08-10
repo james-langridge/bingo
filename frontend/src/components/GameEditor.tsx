@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useGameStore } from '../stores/gameStore';
+import { ShareModal } from './ShareModal';
 import type { BingoItem } from '../../../shared/src/types';
 
 export function GameEditor() {
@@ -11,6 +12,7 @@ export function GameEditor() {
   const [items, setItems] = useState<BingoItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showShareModal, setShowShareModal] = useState(false);
   
   useEffect(() => {
     const loadGame = async () => {
@@ -66,20 +68,7 @@ export function GameEditor() {
   };
   
   const handleShareGame = () => {
-    const playerUrl = `${window.location.origin}/game/${code}`;
-    const adminUrl = window.location.href;
-    
-    const shareText = `Game: ${currentGame?.title}\n\nPlayer Link: ${playerUrl}\nGame Code: ${code}\n\nAdmin Link (keep private): ${adminUrl}`;
-    
-    if (navigator.share) {
-      navigator.share({
-        title: currentGame?.title,
-        text: shareText,
-      });
-    } else {
-      navigator.clipboard.writeText(shareText);
-      alert('Links copied to clipboard!');
-    }
+    setShowShareModal(true);
   };
   
   if (isLoading) {
@@ -192,6 +181,14 @@ export function GameEditor() {
           </p>
         </div>
       </div>
+      
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        gameCode={code || ''}
+        gameTitle={currentGame?.title || ''}
+        adminToken={token}
+      />
     </div>
   );
 }
