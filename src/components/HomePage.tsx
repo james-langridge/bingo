@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGameStore } from '../stores/gameStore';
-import { gameTemplates } from '../lib/templates';
+// import { gameTemplates } from '../lib/templates';
 import { LoadingSkeleton } from './LoadingSkeleton';
 
 export function HomePage() {
@@ -10,38 +10,38 @@ export function HomePage() {
   const [createTitle, setCreateTitle] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [isCreating, setIsCreating] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  // const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   useEffect(() => {
     initialize().finally(() => setIsLoading(false));
   }, [initialize]);
-  
-  const handleUseTemplate = (templateId: string) => {
-    const template = gameTemplates.find(t => t.id === templateId);
-    if (template) {
-      setSelectedTemplate(templateId);
-      setCreateTitle(template.title);
-    }
-  };
-  
+
+  // const handleUseTemplate = (templateId: string) => {
+  //   const template = gameTemplates.find(t => t.id === templateId);
+  //   if (template) {
+  //     setSelectedTemplate(templateId);
+  //     setCreateTitle(template.title);
+  //   }
+  // };
+
   const handleCreateGame = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!createTitle.trim() || isCreating) return;
-    
+
     setIsCreating(true);
     try {
       const game = await createGame(createTitle.trim());
-      
+
       // If template is selected, pre-fill items
-      if (selectedTemplate) {
-        const template = gameTemplates.find(t => t.id === selectedTemplate);
-        if (template) {
-          // Store template items in localStorage for the GameEditor to pick up
-          localStorage.setItem(`template_${game.gameCode}`, JSON.stringify(template.items));
-        }
-      }
-      
+      // if (selectedTemplate) {
+      //   const template = gameTemplates.find(t => t.id === selectedTemplate);
+      //   if (template) {
+      //     // Store template items in localStorage for the GameEditor to pick up
+      //     localStorage.setItem(`template_${game.gameCode}`, JSON.stringify(template.items));
+      //   }
+      // }
+
       // Navigate to admin view
       navigate(`/game/${game.gameCode}/admin/${game.adminToken}`);
     } catch (error) {
@@ -50,15 +50,15 @@ export function HomePage() {
       setIsCreating(false);
     }
   };
-  
+
   const handleJoinGame = (e: React.FormEvent) => {
     e.preventDefault();
     if (!joinCode.trim()) return;
-    
+
     // Navigate to player view
     navigate(`/game/${joinCode.trim().toUpperCase()}`);
   };
-  
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 py-8">
@@ -69,14 +69,14 @@ export function HomePage() {
       </div>
     );
   }
-  
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 py-8">
       <div className="container mx-auto px-4 max-w-2xl">
         <h1 className="text-4xl font-bold text-center mb-8 text-gray-800">
-          Family Bingo
+          Bingo
         </h1>
-        
+
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <h2 className="text-2xl font-semibold mb-4">Create New Game</h2>
           <form onSubmit={handleCreateGame} className="space-y-4">
@@ -97,7 +97,7 @@ export function HomePage() {
             </button>
           </form>
         </div>
-        
+
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <h2 className="text-2xl font-semibold mb-4">Join Existing Game</h2>
           <form onSubmit={handleJoinGame} className="space-y-4">
@@ -118,7 +118,7 @@ export function HomePage() {
             </button>
           </form>
         </div>
-        
+
         {localGames.length > 0 && (
           <div className="bg-white rounded-lg shadow-md p-6">
             <h2 className="text-2xl font-semibold mb-4">Your Games</h2>
@@ -150,32 +150,32 @@ export function HomePage() {
             </div>
           </div>
         )}
-        
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-2xl font-semibold mb-4">Quick Start Templates</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {gameTemplates.map(template => (
-              <button
-                key={template.id}
-                onClick={() => handleUseTemplate(template.id)}
-                className={`p-3 rounded-lg border-2 transition-all text-left hover:shadow-lg active:scale-95 ${
-                  selectedTemplate === template.id
-                    ? 'border-purple-500 bg-purple-50'
-                    : 'border-gray-200 hover:border-purple-300'
-                }`}
-              >
-                <div className="text-2xl mb-1">{template.icon}</div>
-                <div className="font-medium text-sm">{template.title}</div>
-                <div className="text-xs text-gray-500">{template.description}</div>
-              </button>
-            ))}
-          </div>
-          {selectedTemplate && (
-            <div className="mt-4 p-3 bg-purple-50 rounded-lg text-sm text-purple-700">
-              Template selected! Customize the title above and create your game.
-            </div>
-          )}
-        </div>
+
+        {/*<div className="bg-white rounded-lg shadow-md p-6">*/}
+        {/*  <h2 className="text-2xl font-semibold mb-4">Quick Start Templates</h2>*/}
+        {/*  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">*/}
+        {/*    {gameTemplates.map(template => (*/}
+        {/*      <button*/}
+        {/*        key={template.id}*/}
+        {/*        onClick={() => handleUseTemplate(template.id)}*/}
+        {/*        className={`p-3 rounded-lg border-2 transition-all text-left hover:shadow-lg active:scale-95 ${*/}
+        {/*          selectedTemplate === template.id*/}
+        {/*            ? 'border-purple-500 bg-purple-50'*/}
+        {/*            : 'border-gray-200 hover:border-purple-300'*/}
+        {/*        }`}*/}
+        {/*      >*/}
+        {/*        <div className="text-2xl mb-1">{template.icon}</div>*/}
+        {/*        <div className="font-medium text-sm">{template.title}</div>*/}
+        {/*        <div className="text-xs text-gray-500">{template.description}</div>*/}
+        {/*      </button>*/}
+        {/*    ))}*/}
+        {/*  </div>*/}
+        {/*  {selectedTemplate && (*/}
+        {/*    <div className="mt-4 p-3 bg-purple-50 rounded-lg text-sm text-purple-700">*/}
+        {/*      Template selected! Customize the title above and create your game.*/}
+        {/*    </div>*/}
+        {/*  )}*/}
+        {/*</div>*/}
       </div>
     </div>
   );
