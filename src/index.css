@@ -20,13 +20,16 @@ button {
 }
 
 /* Better mobile tap targets */
-button, a {
+button,
+a {
   min-height: 44px;
   min-width: 44px;
 }
 
 /* Prevent input zoom on iOS */
-input, textarea, select {
+input,
+textarea,
+select {
   font-size: 16px !important;
 }
 

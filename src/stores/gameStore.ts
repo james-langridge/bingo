@@ -1,21 +1,26 @@
-import { create } from 'zustand';
-import { produce } from 'immer';
-import type { Game, PlayerState, BingoItem } from '../types/types.ts';
-import { generateGameCode, generateAdminToken } from '../lib/calculations';
+import { create } from "zustand";
+import { produce } from "immer";
+import type { Game, PlayerState, BingoItem } from "../types/types.ts";
+import { generateGameCode, generateAdminToken } from "../lib/calculations";
 import {
   saveGameLocal,
   loadLocalGames,
   loadGameByCode,
   deleteGameLocal,
   savePlayerState,
-  loadPlayerState
-} from '../lib/storage';
+  loadPlayerState,
+} from "../lib/storage";
 
 interface GameStore {
   // Immutable state
   currentGame: Game | null;
   playerState: PlayerState | null;
-  localGames: readonly { id: string; gameCode: string; adminToken?: string; title: string }[];
+  localGames: readonly {
+    id: string;
+    gameCode: string;
+    adminToken?: string;
+    title: string;
+  }[];
   isLoading: boolean;
 
   // Actions (thin layer over calculations)
@@ -54,15 +59,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     await saveGameLocal(game);
 
-    set(produce(draft => {
-      draft.currentGame = game;
-      draft.localGames.push({
-        id: game.id,
-        gameCode: game.gameCode,
-        adminToken: game.adminToken,
-        title: game.title,
-      });
-    }));
+    set(
+      produce((draft) => {
+        draft.currentGame = game;
+        draft.localGames.push({
+          id: game.id,
+          gameCode: game.gameCode,
+          adminToken: game.adminToken,
+          title: game.title,
+        });
+      }),
+    );
 
     return game;
   },
@@ -95,7 +102,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         currentGame: null,
         isLoading: false,
       });
-      throw new Error('Invalid admin token');
+      throw new Error("Invalid admin token");
     }
   },
 
@@ -111,34 +118,40 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     await saveGameLocal(updatedGame);
 
-    set(produce(draft => {
-      draft.currentGame = updatedGame;
-      const gameIndex = draft.localGames.findIndex((g: any) => g.id === updatedGame.id);
-      if (gameIndex >= 0) {
-        draft.localGames[gameIndex] = {
-          id: updatedGame.id,
-          gameCode: updatedGame.gameCode,
-          adminToken: updatedGame.adminToken,
-          title: updatedGame.title,
-        };
-      }
-    }));
+    set(
+      produce((draft) => {
+        draft.currentGame = updatedGame;
+        const gameIndex = draft.localGames.findIndex(
+          (g: any) => g.id === updatedGame.id,
+        );
+        if (gameIndex >= 0) {
+          draft.localGames[gameIndex] = {
+            id: updatedGame.id,
+            gameCode: updatedGame.gameCode,
+            adminToken: updatedGame.adminToken,
+            title: updatedGame.title,
+          };
+        }
+      }),
+    );
   },
 
   deleteGame: async (gameId) => {
     await deleteGameLocal(gameId);
 
-    set(produce(draft => {
-      draft.localGames = draft.localGames.filter((g: any) => g.id !== gameId);
-      if (draft.currentGame?.id === gameId) {
-        draft.currentGame = null;
-      }
-    }));
+    set(
+      produce((draft) => {
+        draft.localGames = draft.localGames.filter((g: any) => g.id !== gameId);
+        if (draft.currentGame?.id === gameId) {
+          draft.currentGame = null;
+        }
+      }),
+    );
   },
 
   joinGame: async (gameCode, displayName) => {
     const game = await loadGameByCode(gameCode);
-    if (!game) throw new Error('Game not found');
+    if (!game) throw new Error("Game not found");
 
     const playerState: PlayerState = {
       gameCode,
@@ -156,18 +169,22 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   markPosition: (position) => {
-    set(produce(draft => {
-      if (!draft.playerState) return;
+    set(
+      produce((draft) => {
+        if (!draft.playerState) return;
 
-      const marked = draft.playerState.markedPositions;
-      if (marked.includes(position)) {
-        draft.playerState.markedPositions = marked.filter((pos: number) => pos !== position);
-      } else {
-        draft.playerState.markedPositions = [...marked, position];
-      }
+        const marked = draft.playerState.markedPositions;
+        if (marked.includes(position)) {
+          draft.playerState.markedPositions = marked.filter(
+            (pos: number) => pos !== position,
+          );
+        } else {
+          draft.playerState.markedPositions = [...marked, position];
+        }
 
-      draft.playerState.lastSyncAt = Date.now();
-    }));
+        draft.playerState.lastSyncAt = Date.now();
+      }),
+    );
 
     // Save updated player state
     const { playerState } = get();
@@ -177,11 +194,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   clearMarkedPositions: () => {
-    set(produce(draft => {
-      if (!draft.playerState) return;
-      draft.playerState.markedPositions = [];
-      draft.playerState.lastSyncAt = Date.now();
-    }));
+    set(
+      produce((draft) => {
+        if (!draft.playerState) return;
+        draft.playerState.markedPositions = [];
+        draft.playerState.lastSyncAt = Date.now();
+      }),
+    );
 
     // Save updated player state
     const { playerState } = get();
@@ -194,7 +213,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({ isLoading: true });
 
     const games = await loadLocalGames();
-    const localGames = games.map(game => ({
+    const localGames = games.map((game) => ({
       id: game.id,
       gameCode: game.gameCode,
       adminToken: game.adminToken,

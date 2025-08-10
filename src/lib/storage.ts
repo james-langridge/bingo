@@ -1,5 +1,5 @@
-import Dexie, { type Table } from 'dexie';
-import type { Game, PlayerState, GameEvent } from '../types/types.ts';
+import Dexie, { type Table } from "dexie";
+import type { Game, PlayerState, GameEvent } from "../types/types.ts";
 
 class BingoDB extends Dexie {
   games!: Table<Game>;
@@ -7,11 +7,11 @@ class BingoDB extends Dexie {
   pendingEvents!: Table<GameEvent & { id?: number }>;
 
   constructor() {
-    super('BingoDB');
+    super("BingoDB");
     this.version(1).stores({
-      games: 'id, gameCode, adminToken',
-      playerStates: 'gameCode',
-      pendingEvents: '++id, timestamp',
+      games: "id, gameCode, adminToken",
+      playerStates: "gameCode",
+      pendingEvents: "++id, timestamp",
     });
   }
 }
@@ -27,12 +27,16 @@ export async function loadLocalGames(): Promise<Game[]> {
   return await db.games.toArray();
 }
 
-export async function loadGameByCode(gameCode: string): Promise<Game | undefined> {
-  return await db.games.where('gameCode').equals(gameCode).first();
+export async function loadGameByCode(
+  gameCode: string,
+): Promise<Game | undefined> {
+  return await db.games.where("gameCode").equals(gameCode).first();
 }
 
-export async function loadGameByAdminToken(adminToken: string): Promise<Game | undefined> {
-  return await db.games.where('adminToken').equals(adminToken).first();
+export async function loadGameByAdminToken(
+  adminToken: string,
+): Promise<Game | undefined> {
+  return await db.games.where("adminToken").equals(adminToken).first();
 }
 
 export async function deleteGameLocal(gameId: string): Promise<void> {
@@ -43,7 +47,9 @@ export async function savePlayerState(playerState: PlayerState): Promise<void> {
   await db.playerStates.put(playerState);
 }
 
-export async function loadPlayerState(gameCode: string): Promise<PlayerState | undefined> {
+export async function loadPlayerState(
+  gameCode: string,
+): Promise<PlayerState | undefined> {
   return await db.playerStates.get(gameCode);
 }
 

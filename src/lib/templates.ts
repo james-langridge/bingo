@@ -8,10 +8,10 @@ export interface GameTemplate {
 
 export const gameTemplates: GameTemplate[] = [
   {
-    id: 'holiday-dinner',
-    title: 'Holiday Dinner',
-    description: 'Classic family gathering moments',
-    icon: '🦃',
+    id: "holiday-dinner",
+    title: "Holiday Dinner",
+    description: "Classic family gathering moments",
+    icon: "🦃",
     items: [
       "Someone arrives late",
       "Kid won't eat vegetables",
@@ -37,14 +37,14 @@ export const gameTemplates: GameTemplate[] = [
       "Surprise guest",
       "Kitchen disaster",
       "Leftovers debate",
-      "Thank you speech"
-    ]
+      "Thank you speech",
+    ],
   },
   {
-    id: 'road-trip',
-    title: 'Road Trip',
-    description: 'Long drive entertainment',
-    icon: '🚗',
+    id: "road-trip",
+    title: "Road Trip",
+    description: "Long drive entertainment",
+    icon: "🚗",
     items: [
       "Are we there yet?",
       "Bathroom break needed",
@@ -70,14 +70,14 @@ export const gameTemplates: GameTemplate[] = [
       "Road construction",
       "Drive-thru order wrong",
       "Map reading confusion",
-      "Sing-along moment"
-    ]
+      "Sing-along moment",
+    ],
   },
   {
-    id: 'family-reunion',
-    title: 'Family Reunion',
-    description: 'Extended family gathering',
-    icon: '👨‍👩‍👧‍👦',
+    id: "family-reunion",
+    title: "Family Reunion",
+    description: "Extended family gathering",
+    icon: "👨‍👩‍👧‍👦",
     items: [
       "Name forgotten",
       "Baby passed around",
@@ -103,14 +103,14 @@ export const gameTemplates: GameTemplate[] = [
       "Gift exchange",
       "Recipe requested",
       "Contact info exchanged",
-      "Promise to visit more"
-    ]
+      "Promise to visit more",
+    ],
   },
   {
-    id: 'video-call',
-    title: 'Video Call',
-    description: 'Virtual meeting bingo',
-    icon: '💻',
+    id: "video-call",
+    title: "Video Call",
+    description: "Virtual meeting bingo",
+    icon: "💻",
     items: [
       "Can you hear me?",
       "You're on mute",
@@ -136,14 +136,14 @@ export const gameTemplates: GameTemplate[] = [
       "Audio cuts out",
       "Chat message missed",
       "Meeting runs over",
-      "Next meeting reminder"
-    ]
+      "Next meeting reminder",
+    ],
   },
   {
-    id: 'birthday-party',
-    title: 'Birthday Party',
-    description: 'Birthday celebration moments',
-    icon: '🎂',
+    id: "birthday-party",
+    title: "Birthday Party",
+    description: "Birthday celebration moments",
+    icon: "🎂",
     items: [
       "Candles won't light",
       "Singing off-key",
@@ -169,7 +169,7 @@ export const gameTemplates: GameTemplate[] = [
       "Memory shared",
       "Next year mentioned",
       "Social media post",
-      "Best party ever said"
-    ]
-  }
+      "Best party ever said",
+    ],
+  },
 ];

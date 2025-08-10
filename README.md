@@ -134,8 +134,9 @@ The application runs entirely client-side and requires no environment variables.
 ### Game Templates
 
 Pre-configured templates available for common scenarios:
+
 - Holiday Dinner
-- Road Trip  
+- Road Trip
 - Family Reunion
 - Video Call
 - Birthday Party
@@ -145,6 +146,7 @@ Templates are defined in `src/lib/templates.ts`.
 ### Sharing Functionality
 
 Games can be shared via:
+
 - **QR Code**: Generated client-side using qrcode library
 - **Direct Link**: Shareable URL with game code
 - **Web Share API**: Native sharing on supported devices
@@ -159,7 +161,7 @@ Games can be shared via:
 
 ## Data Flow
 
-1. **Game Creation**: 
+1. **Game Creation**:
    - User enters title → Generate codes → Create game object → Save to IndexedDB → Navigate to admin view
 
 2. **Game Playing**:
@@ -202,7 +204,7 @@ All IndexedDB operations are async and return promises:
 While formal tests are not yet implemented, the architecture supports:
 
 - **Unit Testing**: Pure functions in `/lib` are easily testable
-- **Component Testing**: Props-based components with clear interfaces  
+- **Component Testing**: Props-based components with clear interfaces
 - **Integration Testing**: Store actions and storage operations
 - **E2E Testing**: User flows through the routing system
 

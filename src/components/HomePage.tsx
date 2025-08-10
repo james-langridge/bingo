@@ -1,14 +1,14 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useGameStore } from '../stores/gameStore';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useGameStore } from "../stores/gameStore";
 // import { gameTemplates } from '../lib/templates';
-import { LoadingSkeleton } from './LoadingSkeleton';
+import { LoadingSkeleton } from "./LoadingSkeleton";
 
 export function HomePage() {
   const navigate = useNavigate();
   const { localGames, createGame, initialize } = useGameStore();
-  const [createTitle, setCreateTitle] = useState('');
-  const [joinCode, setJoinCode] = useState('');
+  const [createTitle, setCreateTitle] = useState("");
+  const [joinCode, setJoinCode] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   // const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -45,7 +45,7 @@ export function HomePage() {
       // Navigate to admin view
       navigate(`/game/${game.gameCode}/admin/${game.adminToken}`);
     } catch (error) {
-      console.error('Failed to create game:', error);
+      console.error("Failed to create game:", error);
     } finally {
       setIsCreating(false);
     }
@@ -93,7 +93,7 @@ export function HomePage() {
               disabled={isCreating || !createTitle.trim()}
               className="w-full px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all"
             >
-              {isCreating ? 'Creating...' : 'Create Game'}
+              {isCreating ? "Creating..." : "Create Game"}
             </button>
           </form>
         </div>
@@ -123,11 +123,16 @@ export function HomePage() {
           <div className="bg-white rounded-lg shadow-md p-6">
             <h2 className="text-2xl font-semibold mb-4">Your Games</h2>
             <div className="space-y-2">
-              {localGames.map(game => (
-                <div key={game.id} className="flex justify-between items-center p-3 border rounded-lg hover:bg-gray-50">
+              {localGames.map((game) => (
+                <div
+                  key={game.id}
+                  className="flex justify-between items-center p-3 border rounded-lg hover:bg-gray-50"
+                >
                   <div>
                     <div className="font-medium">{game.title}</div>
-                    <div className="text-sm text-gray-500 font-mono">Code: {game.gameCode}</div>
+                    <div className="text-sm text-gray-500 font-mono">
+                      Code: {game.gameCode}
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <button
@@ -138,7 +143,11 @@ export function HomePage() {
                     </button>
                     {game.adminToken && (
                       <button
-                        onClick={() => navigate(`/game/${game.gameCode}/admin/${game.adminToken}`)}
+                        onClick={() =>
+                          navigate(
+                            `/game/${game.gameCode}/admin/${game.adminToken}`,
+                          )
+                        }
                         className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm"
                       >
                         Edit

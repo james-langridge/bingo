@@ -1,20 +1,27 @@
-export function LoadingSkeleton({ type = 'default' }: { type?: 'default' | 'board' | 'list' }) {
-  if (type === 'board') {
+export function LoadingSkeleton({
+  type = "default",
+}: {
+  type?: "default" | "board" | "list";
+}) {
+  if (type === "board") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 py-8">
         <div className="container mx-auto px-4">
           <div className="h-10 bg-gray-200 rounded-lg animate-pulse mx-auto w-48 mb-6"></div>
           <div className="grid grid-cols-5 gap-2 p-4 max-w-2xl mx-auto">
             {[...Array(25)].map((_, i) => (
-              <div key={i} className="aspect-square bg-gray-200 rounded-xl animate-pulse"></div>
+              <div
+                key={i}
+                className="aspect-square bg-gray-200 rounded-xl animate-pulse"
+              ></div>
             ))}
           </div>
         </div>
       </div>
     );
   }
-  
-  if (type === 'list') {
+
+  if (type === "list") {
     return (
       <div className="space-y-4">
         {[...Array(3)].map((_, i) => (
@@ -26,7 +33,7 @@ export function LoadingSkeleton({ type = 'default' }: { type?: 'default' | 'boar
       </div>
     );
   }
-  
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 flex items-center justify-center">
       <div className="text-center">

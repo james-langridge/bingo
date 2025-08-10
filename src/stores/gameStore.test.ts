@@ -1,22 +1,24 @@
-import { describe, test, expect, beforeEach, vi, afterEach } from 'vitest';
-import { renderHook, act, waitFor } from '@testing-library/react';
-import 'fake-indexeddb/auto';
-import { useGameStore } from './gameStore';
-import { db } from '../lib/storage';
-import type { Game, BingoItem } from '../types/types';
+import { describe, test, expect, beforeEach, vi, afterEach } from "vitest";
+import { renderHook, act, waitFor } from "@testing-library/react";
+import "fake-indexeddb/auto";
+import { useGameStore } from "./gameStore";
+import { db } from "../lib/storage";
+import type { Game, BingoItem } from "../types/types";
 
 // Mock crypto.randomUUID
-vi.mock('crypto', () => ({
-  randomUUID: vi.fn(() => 'test-uuid-' + Math.random().toString(36).substr(2, 9))
+vi.mock("crypto", () => ({
+  randomUUID: vi.fn(
+    () => "test-uuid-" + Math.random().toString(36).substr(2, 9),
+  ),
 }));
 
-describe('gameStore', () => {
+describe("gameStore", () => {
   beforeEach(async () => {
     // Clear database and reset store before each test
     await db.games.clear();
     await db.playerStates.clear();
     await db.pendingEvents.clear();
-    
+
     // Reset zustand store
     useGameStore.setState({
       currentGame: null,
@@ -30,56 +32,56 @@ describe('gameStore', () => {
     vi.clearAllMocks();
   });
 
-  describe('createGame', () => {
-    test('creates a new game with correct properties', async () => {
+  describe("createGame", () => {
+    test("creates a new game with correct properties", async () => {
       const { result } = renderHook(() => useGameStore());
 
       let game: Game;
       await act(async () => {
-        game = await result.current.createGame('Test Game');
+        game = await result.current.createGame("Test Game");
       });
 
       expect(game!).toBeDefined();
-      expect(game!.title).toBe('Test Game');
+      expect(game!.title).toBe("Test Game");
       expect(game!.gameCode).toMatch(/^[A-Z0-9]{6}$/);
       expect(game!.adminToken).toMatch(/^[a-z0-9]{32}$/);
       expect(game!.items).toEqual([]);
       expect(game!.settings).toEqual({
         gridSize: 5,
         requireFullCard: false,
-        freeSpace: true
+        freeSpace: true,
       });
     });
 
-    test('updates currentGame state', async () => {
+    test("updates currentGame state", async () => {
       const { result } = renderHook(() => useGameStore());
 
       await act(async () => {
-        await result.current.createGame('Test Game');
+        await result.current.createGame("Test Game");
       });
 
       expect(result.current.currentGame).toBeDefined();
-      expect(result.current.currentGame?.title).toBe('Test Game');
+      expect(result.current.currentGame?.title).toBe("Test Game");
     });
 
-    test('adds game to localGames', async () => {
+    test("adds game to localGames", async () => {
       const { result } = renderHook(() => useGameStore());
 
       await act(async () => {
-        await result.current.createGame('Test Game');
+        await result.current.createGame("Test Game");
       });
 
       expect(result.current.localGames).toHaveLength(1);
-      expect(result.current.localGames[0].title).toBe('Test Game');
+      expect(result.current.localGames[0].title).toBe("Test Game");
       expect(result.current.localGames[0].adminToken).toBeDefined();
     });
 
-    test('persists game to storage', async () => {
+    test("persists game to storage", async () => {
       const { result } = renderHook(() => useGameStore());
 
       let game: Game;
       await act(async () => {
-        game = await result.current.createGame('Test Game');
+        game = await result.current.createGame("Test Game");
       });
 
       const storedGames = await db.games.toArray();
@@ -87,28 +89,28 @@ describe('gameStore', () => {
       expect(storedGames[0].id).toBe(game!.id);
     });
 
-    test('creates multiple games with unique codes', async () => {
+    test("creates multiple games with unique codes", async () => {
       const { result } = renderHook(() => useGameStore());
 
       const games: Game[] = [];
       await act(async () => {
-        games.push(await result.current.createGame('Game 1'));
-        games.push(await result.current.createGame('Game 2'));
-        games.push(await result.current.createGame('Game 3'));
+        games.push(await result.current.createGame("Game 1"));
+        games.push(await result.current.createGame("Game 2"));
+        games.push(await result.current.createGame("Game 3"));
       });
 
-      const codes = games.map(g => g.gameCode);
+      const codes = games.map((g) => g.gameCode);
       expect(new Set(codes).size).toBe(3);
     });
   });
 
-  describe('loadGame', () => {
-    test('loads existing game by code', async () => {
+  describe("loadGame", () => {
+    test("loads existing game by code", async () => {
       const { result } = renderHook(() => useGameStore());
 
       let game: Game;
       await act(async () => {
-        game = await result.current.createGame('Test Game');
+        game = await result.current.createGame("Test Game");
       });
 
       // Clear current game to test loading
@@ -124,12 +126,12 @@ describe('gameStore', () => {
       expect(result.current.currentGame?.id).toBe(game!.id);
     });
 
-    test('loads associated player state', async () => {
+    test("loads associated player state", async () => {
       const { result } = renderHook(() => useGameStore());
 
       await act(async () => {
-        const game = await result.current.createGame('Test Game');
-        await result.current.joinGame(game.gameCode, 'Player 1');
+        const game = await result.current.createGame("Test Game");
+        await result.current.joinGame(game.gameCode, "Player 1");
       });
 
       const gameCode = result.current.currentGame!.gameCode;
@@ -144,24 +146,24 @@ describe('gameStore', () => {
       });
 
       expect(result.current.playerState).toBeDefined();
-      expect(result.current.playerState?.displayName).toBe('Player 1');
+      expect(result.current.playerState?.displayName).toBe("Player 1");
     });
 
-    test('sets currentGame to null if game not found', async () => {
+    test("sets currentGame to null if game not found", async () => {
       const { result } = renderHook(() => useGameStore());
 
       await act(async () => {
-        await result.current.loadGame('NOTFOUND');
+        await result.current.loadGame("NOTFOUND");
       });
 
       expect(result.current.currentGame).toBeNull();
     });
 
-    test('sets loading state correctly', async () => {
+    test("sets loading state correctly", async () => {
       const { result } = renderHook(() => useGameStore());
 
       await act(async () => {
-        await result.current.loadGame('ANYCODE');
+        await result.current.loadGame("ANYCODE");
       });
 
       // Check loading is false after completion
@@ -169,13 +171,13 @@ describe('gameStore', () => {
     });
   });
 
-  describe('loadGameAsAdmin', () => {
-    test('loads game with valid admin token', async () => {
+  describe("loadGameAsAdmin", () => {
+    test("loads game with valid admin token", async () => {
       const { result } = renderHook(() => useGameStore());
 
       let game: Game;
       await act(async () => {
-        game = await result.current.createGame('Admin Game');
+        game = await result.current.createGame("Admin Game");
       });
 
       await act(async () => {
@@ -190,33 +192,35 @@ describe('gameStore', () => {
       expect(result.current.currentGame?.id).toBe(game!.id);
     });
 
-    test('throws error with invalid admin token', async () => {
+    test("throws error with invalid admin token", async () => {
       const { result } = renderHook(() => useGameStore());
 
       await act(async () => {
-        await result.current.createGame('Admin Game');
+        await result.current.createGame("Admin Game");
         useGameStore.setState({ currentGame: null });
       });
 
       const gameCode = result.current.localGames[0].gameCode;
 
-      await expect(act(async () => {
-        await result.current.loadGameAsAdmin(gameCode, 'wrong-token');
-      })).rejects.toThrow('Invalid admin token');
+      await expect(
+        act(async () => {
+          await result.current.loadGameAsAdmin(gameCode, "wrong-token");
+        }),
+      ).rejects.toThrow("Invalid admin token");
     });
 
-    test('sets currentGame to null on invalid token', async () => {
+    test("sets currentGame to null on invalid token", async () => {
       const { result } = renderHook(() => useGameStore());
 
       await act(async () => {
-        await result.current.createGame('Admin Game');
+        await result.current.createGame("Admin Game");
       });
 
       const gameCode = result.current.currentGame!.gameCode;
 
       try {
         await act(async () => {
-          await result.current.loadGameAsAdmin(gameCode, 'wrong-token');
+          await result.current.loadGameAsAdmin(gameCode, "wrong-token");
         });
       } catch {
         // Expected error
@@ -226,17 +230,17 @@ describe('gameStore', () => {
     });
   });
 
-  describe('updateGameItems', () => {
-    test('updates game items', async () => {
+  describe("updateGameItems", () => {
+    test("updates game items", async () => {
       const { result } = renderHook(() => useGameStore());
 
       await act(async () => {
-        await result.current.createGame('Test Game');
+        await result.current.createGame("Test Game");
       });
 
       const newItems: BingoItem[] = [
-        { id: '1', text: 'Item 1', position: 0 },
-        { id: '2', text: 'Item 2', position: 1 }
+        { id: "1", text: "Item 1", position: 0 },
+        { id: "2", text: "Item 2", position: 1 },
       ];
 
       await act(async () => {
@@ -246,34 +250,36 @@ describe('gameStore', () => {
       expect(result.current.currentGame?.items).toEqual(newItems);
     });
 
-    test('updates lastModifiedAt timestamp', async () => {
+    test("updates lastModifiedAt timestamp", async () => {
       const { result } = renderHook(() => useGameStore());
 
       await act(async () => {
-        await result.current.createGame('Test Game');
+        await result.current.createGame("Test Game");
       });
 
       const originalTimestamp = result.current.currentGame!.lastModifiedAt;
 
       // Wait a bit to ensure timestamp changes
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       await act(async () => {
         await result.current.updateGameItems([]);
       });
 
-      expect(result.current.currentGame!.lastModifiedAt).toBeGreaterThan(originalTimestamp);
+      expect(result.current.currentGame!.lastModifiedAt).toBeGreaterThan(
+        originalTimestamp,
+      );
     });
 
-    test('persists changes to storage', async () => {
+    test("persists changes to storage", async () => {
       const { result } = renderHook(() => useGameStore());
 
       await act(async () => {
-        await result.current.createGame('Test Game');
+        await result.current.createGame("Test Game");
       });
 
       const newItems: BingoItem[] = [
-        { id: '1', text: 'Updated Item', position: 0 }
+        { id: "1", text: "Updated Item", position: 0 },
       ];
 
       await act(async () => {
@@ -284,7 +290,7 @@ describe('gameStore', () => {
       expect(storedGame?.items).toEqual(newItems);
     });
 
-    test('does nothing if no current game', async () => {
+    test("does nothing if no current game", async () => {
       const { result } = renderHook(() => useGameStore());
 
       await act(async () => {
@@ -295,13 +301,13 @@ describe('gameStore', () => {
     });
   });
 
-  describe('deleteGame', () => {
-    test('deletes game from storage', async () => {
+  describe("deleteGame", () => {
+    test("deletes game from storage", async () => {
       const { result } = renderHook(() => useGameStore());
 
       let game: Game;
       await act(async () => {
-        game = await result.current.createGame('To Delete');
+        game = await result.current.createGame("To Delete");
       });
 
       await act(async () => {
@@ -312,12 +318,12 @@ describe('gameStore', () => {
       expect(storedGames).toHaveLength(0);
     });
 
-    test('removes game from localGames', async () => {
+    test("removes game from localGames", async () => {
       const { result } = renderHook(() => useGameStore());
 
       let game: Game;
       await act(async () => {
-        game = await result.current.createGame('To Delete');
+        game = await result.current.createGame("To Delete");
       });
 
       await act(async () => {
@@ -327,12 +333,12 @@ describe('gameStore', () => {
       expect(result.current.localGames).toHaveLength(0);
     });
 
-    test('clears currentGame if it matches deleted game', async () => {
+    test("clears currentGame if it matches deleted game", async () => {
       const { result } = renderHook(() => useGameStore());
 
       let game: Game;
       await act(async () => {
-        game = await result.current.createGame('To Delete');
+        game = await result.current.createGame("To Delete");
       });
 
       await act(async () => {
@@ -342,13 +348,13 @@ describe('gameStore', () => {
       expect(result.current.currentGame).toBeNull();
     });
 
-    test('preserves other games', async () => {
+    test("preserves other games", async () => {
       const { result } = renderHook(() => useGameStore());
 
       let game1: Game, game2: Game;
       await act(async () => {
-        game1 = await result.current.createGame('Game 1');
-        game2 = await result.current.createGame('Game 2');
+        game1 = await result.current.createGame("Game 1");
+        game2 = await result.current.createGame("Game 2");
       });
 
       await act(async () => {
@@ -360,65 +366,69 @@ describe('gameStore', () => {
     });
   });
 
-  describe('joinGame', () => {
-    test('creates player state for game', async () => {
+  describe("joinGame", () => {
+    test("creates player state for game", async () => {
       const { result } = renderHook(() => useGameStore());
 
       await act(async () => {
-        const game = await result.current.createGame('Test Game');
-        await result.current.joinGame(game.gameCode, 'Player Name');
+        const game = await result.current.createGame("Test Game");
+        await result.current.joinGame(game.gameCode, "Player Name");
       });
 
       expect(result.current.playerState).toBeDefined();
-      expect(result.current.playerState?.displayName).toBe('Player Name');
-      expect(result.current.playerState?.gameCode).toBe(result.current.currentGame?.gameCode);
+      expect(result.current.playerState?.displayName).toBe("Player Name");
+      expect(result.current.playerState?.gameCode).toBe(
+        result.current.currentGame?.gameCode,
+      );
       expect(result.current.playerState?.markedPositions).toEqual([]);
     });
 
-    test('persists player state to storage', async () => {
+    test("persists player state to storage", async () => {
       const { result } = renderHook(() => useGameStore());
 
       let gameCode: string;
       await act(async () => {
-        const game = await result.current.createGame('Test Game');
+        const game = await result.current.createGame("Test Game");
         gameCode = game.gameCode;
-        await result.current.joinGame(gameCode, 'Player Name');
+        await result.current.joinGame(gameCode, "Player Name");
       });
 
       const storedState = await db.playerStates.get(gameCode!);
       expect(storedState).toBeDefined();
-      expect(storedState?.displayName).toBe('Player Name');
+      expect(storedState?.displayName).toBe("Player Name");
     });
 
-    test('throws error if game not found', async () => {
+    test("throws error if game not found", async () => {
       const { result } = renderHook(() => useGameStore());
 
-      await expect(act(async () => {
-        await result.current.joinGame('NOTFOUND', 'Player');
-      })).rejects.toThrow('Game not found');
+      await expect(
+        act(async () => {
+          await result.current.joinGame("NOTFOUND", "Player");
+        }),
+      ).rejects.toThrow("Game not found");
     });
 
-    test('sets currentGame when joining', async () => {
+    test("sets currentGame when joining", async () => {
       const { result } = renderHook(() => useGameStore());
 
       await act(async () => {
-        const game = await result.current.createGame('Test Game');
+        const game = await result.current.createGame("Test Game");
         useGameStore.setState({ currentGame: null });
-        await result.current.joinGame(game.gameCode, 'Player');
+        await result.current.joinGame(game.gameCode, "Player");
       });
 
       expect(result.current.currentGame).toBeDefined();
-      expect(result.current.currentGame?.title).toBe('Test Game');
+      expect(result.current.currentGame?.title).toBe("Test Game");
     });
   });
 
-  describe('markPosition', () => {
-    test('marks unmarked position', async () => {
+  describe("markPosition", () => {
+    test("marks unmarked position", async () => {
       const { result } = renderHook(() => useGameStore());
 
       await act(async () => {
-        const game = await result.current.createGame('Test Game');
-        await result.current.joinGame(game.gameCode, 'Player');
+        const game = await result.current.createGame("Test Game");
+        await result.current.joinGame(game.gameCode, "Player");
       });
 
       await act(async () => {
@@ -428,12 +438,12 @@ describe('gameStore', () => {
       expect(result.current.playerState?.markedPositions).toContain(5);
     });
 
-    test('unmarks marked position', async () => {
+    test("unmarks marked position", async () => {
       const { result } = renderHook(() => useGameStore());
 
       await act(async () => {
-        const game = await result.current.createGame('Test Game');
-        await result.current.joinGame(game.gameCode, 'Player');
+        const game = await result.current.createGame("Test Game");
+        await result.current.joinGame(game.gameCode, "Player");
         result.current.markPosition(5);
       });
 
@@ -444,12 +454,12 @@ describe('gameStore', () => {
       expect(result.current.playerState?.markedPositions).not.toContain(5);
     });
 
-    test('handles multiple positions', async () => {
+    test("handles multiple positions", async () => {
       const { result } = renderHook(() => useGameStore());
 
       await act(async () => {
-        const game = await result.current.createGame('Test Game');
-        await result.current.joinGame(game.gameCode, 'Player');
+        const game = await result.current.createGame("Test Game");
+        await result.current.joinGame(game.gameCode, "Player");
       });
 
       await act(async () => {
@@ -461,33 +471,35 @@ describe('gameStore', () => {
       expect(result.current.playerState?.markedPositions).toEqual([0, 5, 10]);
     });
 
-    test('updates lastSyncAt timestamp', async () => {
+    test("updates lastSyncAt timestamp", async () => {
       const { result } = renderHook(() => useGameStore());
 
       await act(async () => {
-        const game = await result.current.createGame('Test Game');
-        await result.current.joinGame(game.gameCode, 'Player');
+        const game = await result.current.createGame("Test Game");
+        await result.current.joinGame(game.gameCode, "Player");
       });
 
       const originalSync = result.current.playerState!.lastSyncAt;
 
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       await act(async () => {
         result.current.markPosition(5);
       });
 
-      expect(result.current.playerState!.lastSyncAt).toBeGreaterThan(originalSync);
+      expect(result.current.playerState!.lastSyncAt).toBeGreaterThan(
+        originalSync,
+      );
     });
 
-    test('persists changes to storage', async () => {
+    test("persists changes to storage", async () => {
       const { result } = renderHook(() => useGameStore());
 
       let gameCode: string;
       await act(async () => {
-        const game = await result.current.createGame('Test Game');
+        const game = await result.current.createGame("Test Game");
         gameCode = game.gameCode;
-        await result.current.joinGame(gameCode, 'Player');
+        await result.current.joinGame(gameCode, "Player");
       });
 
       await act(async () => {
@@ -500,7 +512,7 @@ describe('gameStore', () => {
       });
     });
 
-    test('does nothing if no player state', async () => {
+    test("does nothing if no player state", async () => {
       const { result } = renderHook(() => useGameStore());
 
       await act(async () => {
@@ -511,13 +523,13 @@ describe('gameStore', () => {
     });
   });
 
-  describe('clearMarkedPositions', () => {
-    test('clears all marked positions', async () => {
+  describe("clearMarkedPositions", () => {
+    test("clears all marked positions", async () => {
       const { result } = renderHook(() => useGameStore());
 
       await act(async () => {
-        const game = await result.current.createGame('Test Game');
-        await result.current.joinGame(game.gameCode, 'Player');
+        const game = await result.current.createGame("Test Game");
+        await result.current.joinGame(game.gameCode, "Player");
         result.current.markPosition(0);
         result.current.markPosition(5);
         result.current.markPosition(10);
@@ -530,34 +542,36 @@ describe('gameStore', () => {
       expect(result.current.playerState?.markedPositions).toEqual([]);
     });
 
-    test('updates lastSyncAt', async () => {
+    test("updates lastSyncAt", async () => {
       const { result } = renderHook(() => useGameStore());
 
       await act(async () => {
-        const game = await result.current.createGame('Test Game');
-        await result.current.joinGame(game.gameCode, 'Player');
+        const game = await result.current.createGame("Test Game");
+        await result.current.joinGame(game.gameCode, "Player");
         result.current.markPosition(5);
       });
 
       const originalSync = result.current.playerState!.lastSyncAt;
 
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       await act(async () => {
         result.current.clearMarkedPositions();
       });
 
-      expect(result.current.playerState!.lastSyncAt).toBeGreaterThan(originalSync);
+      expect(result.current.playerState!.lastSyncAt).toBeGreaterThan(
+        originalSync,
+      );
     });
 
-    test('persists to storage', async () => {
+    test("persists to storage", async () => {
       const { result } = renderHook(() => useGameStore());
 
       let gameCode: string;
       await act(async () => {
-        const game = await result.current.createGame('Test Game');
+        const game = await result.current.createGame("Test Game");
         gameCode = game.gameCode;
-        await result.current.joinGame(gameCode, 'Player');
+        await result.current.joinGame(gameCode, "Player");
         result.current.markPosition(5);
       });
 
@@ -571,7 +585,7 @@ describe('gameStore', () => {
       });
     });
 
-    test('does nothing if no player state', async () => {
+    test("does nothing if no player state", async () => {
       const { result } = renderHook(() => useGameStore());
 
       await act(async () => {
@@ -582,15 +596,15 @@ describe('gameStore', () => {
     });
   });
 
-  describe('initialize', () => {
-    test('loads all local games', async () => {
+  describe("initialize", () => {
+    test("loads all local games", async () => {
       const { result } = renderHook(() => useGameStore());
 
       // Create some games
       await act(async () => {
-        await result.current.createGame('Game 1');
-        await result.current.createGame('Game 2');
-        await result.current.createGame('Game 3');
+        await result.current.createGame("Game 1");
+        await result.current.createGame("Game 2");
+        await result.current.createGame("Game 3");
       });
 
       // Reset localGames to test initialization
@@ -603,12 +617,12 @@ describe('gameStore', () => {
       });
 
       expect(result.current.localGames).toHaveLength(3);
-      expect(result.current.localGames.map(g => g.title)).toContain('Game 1');
-      expect(result.current.localGames.map(g => g.title)).toContain('Game 2');
-      expect(result.current.localGames.map(g => g.title)).toContain('Game 3');
+      expect(result.current.localGames.map((g) => g.title)).toContain("Game 1");
+      expect(result.current.localGames.map((g) => g.title)).toContain("Game 2");
+      expect(result.current.localGames.map((g) => g.title)).toContain("Game 3");
     });
 
-    test('sets loading state correctly', async () => {
+    test("sets loading state correctly", async () => {
       const { result } = renderHook(() => useGameStore());
 
       await act(async () => {
@@ -618,7 +632,7 @@ describe('gameStore', () => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    test('handles empty storage', async () => {
+    test("handles empty storage", async () => {
       const { result } = renderHook(() => useGameStore());
 
       await act(async () => {

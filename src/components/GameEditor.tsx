@@ -1,14 +1,14 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { useGameStore } from '../stores/gameStore';
-import { ShareModal } from './ShareModal';
-import type { BingoItem } from '../types/types.ts';
+import { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useGameStore } from "../stores/gameStore";
+import { ShareModal } from "./ShareModal";
+import type { BingoItem } from "../types/types.ts";
 
 export function GameEditor() {
   const navigate = useNavigate();
   const { code, token } = useParams<{ code: string; token: string }>();
   const { currentGame, loadGameAsAdmin, updateGameItems } = useGameStore();
-  const [newItemText, setNewItemText] = useState('');
+  const [newItemText, setNewItemText] = useState("");
   const [items, setItems] = useState<BingoItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -17,7 +17,7 @@ export function GameEditor() {
   useEffect(() => {
     const loadGame = async () => {
       if (!code || !token) {
-        setError('Invalid game URL');
+        setError("Invalid game URL");
         setIsLoading(false);
         return;
       }
@@ -26,7 +26,7 @@ export function GameEditor() {
         await loadGameAsAdmin(code, token);
         setIsLoading(false);
       } catch (err) {
-        setError('Not authorized to edit this game');
+        setError("Not authorized to edit this game");
         setIsLoading(false);
       }
     };
@@ -43,11 +43,13 @@ export function GameEditor() {
       if (templateItems && currentGame.items.length === 0) {
         // Use template items if game has no items yet
         const items = JSON.parse(templateItems);
-        const bingoItems: BingoItem[] = items.slice(0, 25).map((text: string, index: number) => ({
-          id: crypto.randomUUID(),
-          text,
-          position: index
-        }));
+        const bingoItems: BingoItem[] = items
+          .slice(0, 25)
+          .map((text: string, index: number) => ({
+            id: crypto.randomUUID(),
+            text,
+            position: index,
+          }));
         setItems(bingoItems);
         localStorage.removeItem(templateKey);
       } else {
@@ -68,19 +70,19 @@ export function GameEditor() {
 
     const updatedItems = [...items, newItem];
     setItems(updatedItems);
-    setNewItemText('');
+    setNewItemText("");
   };
 
   const handleRemoveItem = (itemId: string) => {
     const updatedItems = items
-      .filter(item => item.id !== itemId)
+      .filter((item) => item.id !== itemId)
       .map((item, index) => ({ ...item, position: index }));
     setItems(updatedItems);
   };
 
   const handleSaveItems = async () => {
     await updateGameItems(items);
-    alert('Game saved successfully!');
+    alert("Game saved successfully!");
   };
 
   const handleShareGame = () => {
@@ -100,7 +102,7 @@ export function GameEditor() {
       <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center">
         <div className="text-xl text-red-600 mb-4">{error}</div>
         <button
-          onClick={() => navigate('/')}
+          onClick={() => navigate("/")}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
         >
           Go Home
@@ -119,8 +121,12 @@ export function GameEditor() {
           <div className="flex justify-between items-start mb-4">
             <div>
               <h1 className="text-2xl font-bold">{currentGame?.title}</h1>
-              <p className="text-gray-600">Game Code: <span className="font-mono font-bold">{code}</span></p>
-              <p className="text-sm text-gray-500">Grid Size: {gridSize}x{gridSize}</p>
+              <p className="text-gray-600">
+                Game Code: <span className="font-mono font-bold">{code}</span>
+              </p>
+              <p className="text-sm text-gray-500">
+                Grid Size: {gridSize}x{gridSize}
+              </p>
             </div>
             <div className="flex gap-2">
               <button
@@ -139,7 +145,9 @@ export function GameEditor() {
           </div>
 
           <div className="border-t pt-4">
-            <h2 className="text-lg font-semibold mb-2">Add Bingo Items ({items.length}/{maxItems})</h2>
+            <h2 className="text-lg font-semibold mb-2">
+              Add Bingo Items ({items.length}/{maxItems})
+            </h2>
             <form onSubmit={handleAddItem} className="flex gap-2 mb-4">
               <input
                 type="text"
@@ -165,8 +173,13 @@ export function GameEditor() {
             ) : (
               <div className="space-y-2 mb-4">
                 {items.map((item, index) => (
-                  <div key={item.id} className="flex items-center gap-2 p-2 border rounded-lg">
-                    <span className="w-8 text-center text-gray-500">{index + 1}.</span>
+                  <div
+                    key={item.id}
+                    className="flex items-center gap-2 p-2 border rounded-lg"
+                  >
+                    <span className="w-8 text-center text-gray-500">
+                      {index + 1}.
+                    </span>
                     <span className="flex-1">{item.text}</span>
                     <button
                       onClick={() => handleRemoveItem(item.id)}
@@ -192,8 +205,9 @@ export function GameEditor() {
 
         <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-4">
           <p className="text-sm">
-            <strong>Tip:</strong> Add {maxItems} items to fill your {gridSize}x{gridSize} grid.
-            Players will see these items randomly arranged on their bingo boards.
+            <strong>Tip:</strong> Add {maxItems} items to fill your {gridSize}x
+            {gridSize} grid. Players will see these items randomly arranged on
+            their bingo boards.
           </p>
         </div>
       </div>
@@ -201,8 +215,8 @@ export function GameEditor() {
       <ShareModal
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}
-        gameCode={code || ''}
-        gameTitle={currentGame?.title || ''}
+        gameCode={code || ""}
+        gameTitle={currentGame?.title || ""}
         adminToken={token}
       />
     </div>

@@ -1,89 +1,90 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { useGameStore } from '../stores/gameStore';
-import { GameBoard } from './GameBoard';
-import { Celebration } from './Celebration';
-import { LoadingSkeleton } from './LoadingSkeleton';
-import { usePullToRefresh } from '../hooks/usePullToRefresh';
-import { checkWinCondition, shuffleItems } from '../lib/calculations';
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useGameStore } from "../stores/gameStore";
+import { GameBoard } from "./GameBoard";
+import { Celebration } from "./Celebration";
+import { LoadingSkeleton } from "./LoadingSkeleton";
+import { usePullToRefresh } from "../hooks/usePullToRefresh";
+import { checkWinCondition, shuffleItems } from "../lib/calculations";
 
 export function GamePlayer() {
   const navigate = useNavigate();
   const { code } = useParams<{ code: string }>();
-  const { 
-    currentGame, 
-    playerState, 
-    loadGame, 
-    joinGame, 
-    markPosition, 
-    clearMarkedPositions 
+  const {
+    currentGame,
+    playerState,
+    loadGame,
+    joinGame,
+    markPosition,
+    clearMarkedPositions,
   } = useGameStore();
-  const [displayName, setDisplayName] = useState('');
+  const [displayName, setDisplayName] = useState("");
   const [isJoining, setIsJoining] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  
+
   // Deterministic shuffle - always call this hook, even if we don't use the result yet
   const shuffledItems = useMemo(() => {
     if (!currentGame || !playerState) return [];
     const seed = `${currentGame.gameCode}-${playerState.displayName}`;
     return shuffleItems(currentGame.items, seed);
   }, [currentGame, playerState]);
-  
+
   useEffect(() => {
     const initGame = async () => {
       if (!code) {
-        setError('Invalid game code');
+        setError("Invalid game code");
         setIsLoading(false);
         return;
       }
-      
+
       try {
         await loadGame(code);
         setIsLoading(false);
       } catch (err) {
-        setError('Game not found');
+        setError("Game not found");
         setIsLoading(false);
       }
     };
-    
+
     initGame();
   }, [code, loadGame]);
-  
+
   const handleRefresh = useCallback(async () => {
     if (!code) return;
     setIsRefreshing(true);
     await loadGame(code);
     setTimeout(() => setIsRefreshing(false), 500);
   }, [code, loadGame]);
-  
-  const { containerRef, isPulling, pullDistance } = usePullToRefresh(handleRefresh);
-  
+
+  const { containerRef, isPulling, pullDistance } =
+    usePullToRefresh(handleRefresh);
+
   const handleJoinGame = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!displayName.trim() || !code) return;
-    
+
     setIsJoining(true);
     try {
       await joinGame(code, displayName.trim());
     } catch (err) {
-      setError('Failed to join game');
+      setError("Failed to join game");
     } finally {
       setIsJoining(false);
     }
   };
-  
+
   if (isLoading) {
     return <LoadingSkeleton type="board" />;
   }
-  
+
   if (error) {
     return (
       <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center">
         <div className="text-xl text-red-600 mb-4">{error}</div>
         <button
-          onClick={() => navigate('/')}
+          onClick={() => navigate("/")}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
         >
           Go Home
@@ -91,13 +92,13 @@ export function GamePlayer() {
       </div>
     );
   }
-  
+
   if (!currentGame) {
     return (
       <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center">
         <div className="text-xl mb-4">Game not found</div>
         <button
-          onClick={() => navigate('/')}
+          onClick={() => navigate("/")}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
         >
           Go Home
@@ -105,7 +106,7 @@ export function GamePlayer() {
       </div>
     );
   }
-  
+
   // Show join form if not yet joined
   if (!playerState) {
     return (
@@ -113,8 +114,10 @@ export function GamePlayer() {
         <div className="container mx-auto px-4 max-w-md">
           <div className="bg-white rounded-lg shadow-md p-6">
             <h1 className="text-2xl font-bold mb-2">{currentGame.title}</h1>
-            <p className="text-gray-600 mb-6">Game Code: <span className="font-mono font-bold">{code}</span></p>
-            
+            <p className="text-gray-600 mb-6">
+              Game Code: <span className="font-mono font-bold">{code}</span>
+            </p>
+
             <form onSubmit={handleJoinGame} className="space-y-4">
               <input
                 type="text"
@@ -129,7 +132,7 @@ export function GamePlayer() {
                 disabled={isJoining || !displayName.trim()}
                 className="w-full px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
-                {isJoining ? 'Joining...' : 'Join Game'}
+                {isJoining ? "Joining..." : "Join Game"}
               </button>
             </form>
           </div>
@@ -137,7 +140,7 @@ export function GamePlayer() {
       </div>
     );
   }
-  
+
   // Check if there are enough items for the game
   if (currentGame.items.length === 0) {
     return (
@@ -145,7 +148,9 @@ export function GamePlayer() {
         <div className="container mx-auto px-4 max-w-lg">
           <div className="bg-white rounded-lg shadow-md p-6 text-center">
             <h1 className="text-2xl font-bold mb-2">{currentGame.title}</h1>
-            <p className="text-gray-600 mb-4">Game Code: <span className="font-mono font-bold">{code}</span></p>
+            <p className="text-gray-600 mb-4">
+              Game Code: <span className="font-mono font-bold">{code}</span>
+            </p>
             <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-4">
               <p className="text-lg">Waiting for game to be set up...</p>
               <p className="text-sm text-gray-600 mt-2">
@@ -157,20 +162,24 @@ export function GamePlayer() {
       </div>
     );
   }
-  
-  const hasWon = playerState ? checkWinCondition(
-    playerState.markedPositions,
-    currentGame.settings.gridSize,
-    currentGame.settings.requireFullCard
-  ) : false;
-  
+
+  const hasWon = playerState
+    ? checkWinCondition(
+        playerState.markedPositions,
+        currentGame.settings.gridSize,
+        currentGame.settings.requireFullCard,
+      )
+    : false;
+
   return (
-    <div 
+    <div
       ref={containerRef}
       className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 py-8 relative"
       style={{
-        transform: isPulling ? `translateY(${pullDistance}px)` : 'translateY(0)',
-        transition: isPulling ? 'none' : 'transform 0.3s ease-out'
+        transform: isPulling
+          ? `translateY(${pullDistance}px)`
+          : "translateY(0)",
+        transition: isPulling ? "none" : "transform 0.3s ease-out",
       }}
     >
       {(isPulling || isRefreshing) && (
@@ -182,20 +191,26 @@ export function GamePlayer() {
       )}
       <div className="container mx-auto px-4">
         <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-800">{currentGame.title}</h1>
-          <p className="text-gray-600">Playing as: <strong>{playerState.displayName}</strong></p>
-          <p className="text-sm text-gray-500">Code: <span className="font-mono">{code}</span></p>
+          <h1 className="text-3xl font-bold text-gray-800">
+            {currentGame.title}
+          </h1>
+          <p className="text-gray-600">
+            Playing as: <strong>{playerState.displayName}</strong>
+          </p>
+          <p className="text-sm text-gray-500">
+            Code: <span className="font-mono">{code}</span>
+          </p>
         </div>
-        
+
         {hasWon && <Celebration />}
-        
+
         <GameBoard
           items={shuffledItems}
           markedPositions={playerState.markedPositions}
           gridSize={currentGame.settings.gridSize}
           onItemClick={markPosition}
         />
-        
+
         <div className="flex justify-center mt-6 space-x-4">
           <button
             onClick={clearMarkedPositions}
@@ -204,7 +219,8 @@ export function GamePlayer() {
             Clear Board
           </button>
           <div className="text-gray-600 py-2">
-            Marked: {playerState.markedPositions.length} / {currentGame.items.length}
+            Marked: {playerState.markedPositions.length} /{" "}
+            {currentGame.items.length}
           </div>
         </div>
       </div>
