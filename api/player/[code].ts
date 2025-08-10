@@ -15,12 +15,23 @@ const logger = pino({
   }),
 });
 
+// Check for Redis credentials
+const hasRedisCredentials = process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN;
+
+if (!hasRedisCredentials) {
+  logger.error({
+    msg: "Redis credentials missing",
+    hasUrl: !!process.env.KV_REST_API_URL,
+    hasToken: !!process.env.KV_REST_API_TOKEN,
+  });
+}
+
 // Initialize Redis with environment variables
 // Vercel automatically sets KV_REST_API_URL and KV_REST_API_TOKEN
-const redis = new Redis({
+const redis = hasRedisCredentials ? new Redis({
   url: process.env.KV_REST_API_URL!,
   token: process.env.KV_REST_API_TOKEN!,
-});
+}) : null;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const startTime = Date.now();
@@ -31,6 +42,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     method: req.method,
     gameCode: code,
   });
+
+  // Check Redis connection
+  if (!redis) {
+    logger.error({ msg: "Redis not configured" });
+    return res.status(503).json({ 
+      error: "Storage service not configured",
+      details: "Redis credentials are missing. Please check Vercel environment variables."
+    });
+  }
 
   if (!code || typeof code !== "string") {
     logger.warn({ msg: "Invalid game code", code });

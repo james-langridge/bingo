@@ -51,13 +51,26 @@ async function fetchGameFromServer(gameCode: string): Promise<Game | null> {
     const duration = Math.round(performance.now() - startTime);
     
     if (response.ok) {
-      const data = await response.json();
-      // Handle both direct game object and stringified JSON
-      const game = typeof data === "string" ? JSON.parse(data) : data;
-      console.log(`[Storage] ✅ Game ${gameCode} fetched from server (${duration}ms)`);
-      return game;
+      // Check if response is JSON
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const data = await response.json();
+        // Handle both direct game object and stringified JSON
+        const game = typeof data === "string" ? JSON.parse(data) : data;
+        console.log(`[Storage] ✅ Game ${gameCode} fetched from server (${duration}ms)`);
+        return game;
+      } else {
+        // Non-JSON response (likely HTML error page)
+        const text = await response.text();
+        console.error(`[Storage] ⚠️ Server returned non-JSON response for game ${gameCode} (${duration}ms)`);
+        console.error(`[Storage] Response preview: ${text.substring(0, 200)}`);
+        return null;
+      }
     } else if (response.status === 404) {
       console.log(`[Storage] ℹ️ Game ${gameCode} not found on server (${duration}ms)`);
+    } else if (response.status === 503) {
+      const errorData = await response.json().catch(() => null);
+      console.error(`[Storage] ⚠️ Storage service unavailable (${duration}ms):`, errorData?.details || response.statusText);
     } else {
       console.warn(`[Storage] ⚠️ Failed to fetch game ${gameCode}: ${response.status} ${response.statusText} (${duration}ms)`);
     }
