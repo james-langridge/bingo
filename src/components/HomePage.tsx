@@ -6,7 +6,7 @@ import { LoadingSkeleton } from "./LoadingSkeleton";
 
 export function HomePage() {
   const navigate = useNavigate();
-  const { localGames, createGame, initialize } = useGameStore();
+  const { localGames, createGame, deleteGame, initialize } = useGameStore();
   const [createTitle, setCreateTitle] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [isCreating, setIsCreating] = useState(false);
@@ -153,6 +153,16 @@ export function HomePage() {
                         Edit
                       </button>
                     )}
+                    <button
+                      onClick={() => {
+                        if (confirm(`Delete "${game.title}"?`)) {
+                          deleteGame(game.id);
+                        }
+                      }}
+                      className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
+                    >
+                      Delete
+                    </button>
                   </div>
                 </div>
               ))}
