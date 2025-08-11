@@ -136,9 +136,26 @@ export const useGameStore = create<GameStore>((set, get) => ({
         return;
       }
 
+      // If we have a playerState, restore the currentPlayerId
+      // Find the player in the game's players list by matching display name
+      let playerId = null;
+      if (playerState) {
+        const existingPlayer = game.players.find(
+          p => p.displayName === playerState.displayName
+        );
+        if (existingPlayer) {
+          playerId = existingPlayer.id;
+        } else {
+          // If player not found in list, generate new ID
+          // This handles edge cases where player state exists but player was removed
+          playerId = crypto.randomUUID();
+        }
+      }
+
       set({
         currentGame: game,
         playerState: playerState || null,
+        currentPlayerId: playerId,
         lastServerState: game,
         isLoading: false,
       });
