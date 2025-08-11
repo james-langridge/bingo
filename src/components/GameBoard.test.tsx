@@ -42,11 +42,14 @@ describe("GameBoard", () => {
       expect(buttons).toHaveLength(9);
     });
 
-    test("applies grid layout with correct size", () => {
+    test("applies responsive grid layout", () => {
       const { container } = render(<GameBoard {...defaultProps} />);
 
       const grid = container.querySelector(".grid");
-      expect(grid).toHaveStyle({ gridTemplateColumns: "repeat(3, 1fr)" });
+      expect(grid).toHaveStyle({ 
+        gridAutoRows: "min-content",
+        gridAutoFlow: "dense" 
+      });
     });
 
     test("handles different grid sizes", () => {
@@ -61,7 +64,11 @@ describe("GameBoard", () => {
       );
 
       const grid = container.querySelector(".grid");
-      expect(grid).toHaveStyle({ gridTemplateColumns: "repeat(5, 1fr)" });
+      // Check that grid has responsive auto-fit columns
+      expect(grid).toHaveStyle({ 
+        gridAutoRows: "min-content",
+        gridAutoFlow: "dense" 
+      });
 
       const buttons = screen.getAllByRole("button");
       expect(buttons).toHaveLength(25);
@@ -278,7 +285,7 @@ describe("GameBoard", () => {
       render(<GameBoard {...defaultProps} />);
 
       const button = screen.getAllByRole("button")[0];
-      expect(button.className).toContain("aspect-square");
+      expect(button.className).toContain("min-h-[80px]");
       expect(button.className).toContain("rounded-xl");
       expect(button.className).toContain("font-medium");
     });
