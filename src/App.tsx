@@ -1,9 +1,26 @@
 import { useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
 import { HomePage } from "./components/HomePage";
 import { GamePlayer } from "./components/GamePlayer";
 import { GameEditor } from "./components/GameEditor";
+import { ConnectionStatus } from "./components/ConnectionStatus";
 import { processPendingEvents } from "./lib/storage";
+
+function AppContent() {
+  const location = useLocation();
+  const isInGame = location.pathname.includes('/game/');
+
+  return (
+    <>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/game/:code" element={<GamePlayer />} />
+        <Route path="/game/:code/admin/:token" element={<GameEditor />} />
+      </Routes>
+      {isInGame && <ConnectionStatus />}
+    </>
+  );
+}
 
 function App() {
   useEffect(() => {
@@ -29,11 +46,7 @@ function App() {
 
   return (
     <Router>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/game/:code" element={<GamePlayer />} />
-        <Route path="/game/:code/admin/:token" element={<GameEditor />} />
-      </Routes>
+      <AppContent />
     </Router>
   );
 }

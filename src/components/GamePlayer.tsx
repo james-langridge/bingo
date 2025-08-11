@@ -331,7 +331,7 @@ export function GamePlayer() {
                 Players in Game ({currentGame.players.length})
               </h3>
               <span className="text-xs text-gray-500">
-                Updates every 2 seconds
+                Live updates
               </span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
