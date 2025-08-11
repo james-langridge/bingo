@@ -56,17 +56,10 @@ async function syncGameToServer(game: Game): Promise<boolean> {
     return response.ok;
   } catch (error) {
     const duration = Math.round(performance.now() - startTime);
-    // Don't log as error if it's just a network issue (likely local dev without backend)
-    if (error instanceof TypeError && error.message.includes('fetch')) {
-      console.log(
-        `[Storage] ℹ️ No backend available for game ${game.gameCode} - using local storage only (${duration}ms)`,
-      );
-    } else {
-      console.error(
-        `[Storage] ❌ Failed to sync game ${game.gameCode} to server (${duration}ms):`,
-        error,
-      );
-    }
+    console.error(
+      `[Storage] ❌ Failed to sync game ${game.gameCode} to server (${duration}ms):`,
+      error,
+    );
     return false;
   }
 }
@@ -125,17 +118,10 @@ async function fetchGameFromServer(gameCode: string): Promise<Game | null> {
     }
   } catch (error) {
     const duration = Math.round(performance.now() - startTime);
-    // Don't log as error if it's just a network issue (likely local dev without backend)
-    if (error instanceof TypeError && error.message.includes('fetch')) {
-      console.log(
-        `[Storage] ℹ️ No backend available for game ${gameCode} - will use local storage only (${duration}ms)`,
-      );
-    } else {
-      console.error(
-        `[Storage] ❌ Failed to fetch game ${gameCode} from server (${duration}ms):`,
-        error,
-      );
-    }
+    console.error(
+      `[Storage] ❌ Failed to fetch game ${gameCode} from server (${duration}ms):`,
+      error,
+    );
   }
   return null;
 }
@@ -210,13 +196,37 @@ export async function loadGameByCode(
     // When online, always try to get the latest from server
     const serverGame = await fetchGameFromServer(gameCode);
     if (serverGame) {
-      // Use the proper merge function to preserve markedBy data
+      // Intelligent merge: preserve local admin token and merge player lists
       let mergedGame = serverGame;
       
       if (localGame) {
-        // Import the merge function
-        const { mergeGameStates } = await import("./syncManager");
-        mergedGame = mergeGameStates(localGame, serverGame);
+        // Preserve admin token if we have it locally
+        if (localGame.adminToken) {
+          mergedGame = { ...serverGame, adminToken: localGame.adminToken };
+        }
+        
+        // Merge player lists to avoid losing players
+        const playerMap = new Map<string, any>();
+        
+        // Add all server players first (source of truth)
+        serverGame.players?.forEach(player => {
+          playerMap.set(player.displayName, player);
+        });
+        
+        // Add any local players that might be missing (edge case)
+        localGame.players?.forEach(player => {
+          if (!playerMap.has(player.displayName)) {
+            // Player exists locally but not on server - might be a recent join
+            if (Date.now() - player.joinedAt < 30000) { // If joined in last 30 seconds
+              playerMap.set(player.displayName, player);
+            }
+          }
+        });
+        
+        mergedGame = {
+          ...mergedGame,
+          players: Array.from(playerMap.values()),
+        };
       }
       
       // Cache the latest version locally

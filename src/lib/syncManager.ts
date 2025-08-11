@@ -191,35 +191,6 @@ export function mergeGameStates(local: Game, remote: Game): Game {
     adminToken: local.adminToken || remote.adminToken,
   };
 
-  // Merge items to preserve markedBy data (vacation mode feature)
-  const mergedItems = remote.items.map((remoteItem, index) => {
-    const localItem = local.items[index];
-    if (!localItem || !localItem.markedBy) {
-      return remoteItem;
-    }
-    
-    // Merge markedBy arrays
-    const markedByMap = new Map();
-    
-    // Add remote marks first
-    remoteItem.markedBy?.forEach(mark => {
-      markedByMap.set(mark.playerId, mark);
-    });
-    
-    // Add or update with local marks (might be more recent)
-    localItem.markedBy?.forEach(mark => {
-      const existing = markedByMap.get(mark.playerId);
-      if (!existing || mark.markedAt > existing.markedAt) {
-        markedByMap.set(mark.playerId, mark);
-      }
-    });
-    
-    return {
-      ...remoteItem,
-      markedBy: Array.from(markedByMap.values()).sort((a, b) => a.markedAt - b.markedAt),
-    };
-  });
-
   // Merge players list without duplicates
   const playerMap = new Map<string, any>();
   
@@ -245,7 +216,6 @@ export function mergeGameStates(local: Game, remote: Game): Game {
 
   return {
     ...merged,
-    items: mergedItems,
     players: Array.from(playerMap.values()),
     winner: remote.winner, // Always use remote winner (source of truth)
   };
