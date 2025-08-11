@@ -6,6 +6,7 @@ import { Celebration } from "./Celebration";
 import { LoadingSkeleton } from "./LoadingSkeleton";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { NearMissNotification } from "./NearMissNotification";
+import { WinnerNotification } from "./WinnerNotification";
 import { usePullToRefresh } from "../hooks/usePullToRefresh";
 import { checkWinCondition, shuffleItems } from "../lib/calculations";
 
@@ -28,7 +29,6 @@ export function GamePlayer() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [showWinnerNotification, setShowWinnerNotification] = useState(false);
 
   // Deterministic shuffle - always call this hook, even if we don't use the result yet
   const shuffledItems = useMemo(() => {
@@ -61,20 +61,16 @@ export function GamePlayer() {
     console.log({ currentGame });
   }, [currentGame]);
 
-  // Check for new winner
+  // Log winner changes for debugging
   useEffect(() => {
     if (currentGame?.winner) {
-      // Show notification if someone else won
-      if (currentGame.winner.displayName !== playerState?.displayName) {
-        setShowWinnerNotification(true);
-        setTimeout(() => setShowWinnerNotification(false), 10000); // Show for 10 seconds
-      }
+      console.log("[GamePlayer] Winner detected:", {
+        winnerName: currentGame.winner.displayName,
+        isCurrentPlayer: currentGame.winner.displayName === playerState?.displayName,
+        wonAt: new Date(currentGame.winner.wonAt).toLocaleTimeString(),
+      });
     }
-  }, [
-    currentGame?.winner?.wonAt,
-    currentGame?.winner?.displayName,
-    playerState?.displayName,
-  ]);
+  }, [currentGame?.winner, playerState?.displayName]);
 
   // Cleanup polling on unmount
   useEffect(() => {
@@ -275,21 +271,6 @@ export function GamePlayer() {
         </div>
       )}
 
-      {/* Winner notification banner */}
-      {showWinnerNotification && currentGame.winner && (
-        <div className="fixed top-4 left-4 right-4 z-50 animate-bounce">
-          <div className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white p-4 rounded-lg shadow-lg">
-            <div className="flex items-center justify-center">
-              <span className="text-2xl mr-2">🎉</span>
-              <span className="font-bold text-lg">
-                {currentGame.winner.displayName} has won the game!
-              </span>
-              <span className="text-2xl ml-2">🏆</span>
-            </div>
-          </div>
-        </div>
-      )}
-
       {isRefreshing && (
         <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
           <div className="text-lg font-semibold">Refreshing...</div>
@@ -361,6 +342,14 @@ export function GamePlayer() {
               ))}
             </div>
           </div>
+
+          {/* Persistent winner notification */}
+          {currentGame.winner && (
+            <WinnerNotification
+              winnerName={currentGame.winner.displayName}
+              isCurrentPlayer={currentGame.winner.displayName === playerState?.displayName}
+            />
+          )}
 
           <ErrorBoundary 
             context="GameBoard"
