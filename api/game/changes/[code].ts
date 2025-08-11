@@ -86,6 +86,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         winner: game.winner,
         items: game.items?.map((item: any) => ({
           id: item.id,
+          text: item.text,  // Include text field
+          position: item.position,  // Include position
           markedBy: item.markedBy,
         })),
       },

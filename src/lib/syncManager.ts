@@ -348,12 +348,12 @@ export function mergeGameStates(local: Game, remote: Game): Game {
     adminToken: local.adminToken || remote.adminToken,
   };
 
-  // Merge items to preserve markedBy data (vacation mode feature)
+  // Merge items to preserve markedBy data (vacation mode feature) and all fields
   const mergedItems = remote.items.map((remoteItem, index) => {
     const localItem = local.items[index];
-    if (!localItem || !localItem.markedBy) {
-      return remoteItem;
-    }
+    
+    // Start with local item to preserve all fields, then overlay remote updates
+    const baseItem = localItem || remoteItem;
     
     // Merge markedBy arrays
     const markedByMap = new Map();
@@ -364,7 +364,7 @@ export function mergeGameStates(local: Game, remote: Game): Game {
     });
     
     // Add or update with local marks (might be more recent)
-    localItem.markedBy?.forEach(mark => {
+    localItem?.markedBy?.forEach(mark => {
       const existing = markedByMap.get(mark.playerId);
       if (!existing || mark.markedAt > existing.markedAt) {
         markedByMap.set(mark.playerId, mark);
@@ -372,7 +372,12 @@ export function mergeGameStates(local: Game, remote: Game): Game {
     });
     
     return {
-      ...remoteItem,
+      ...baseItem,  // Start with all fields from local (including text)
+      ...remoteItem, // Overlay remote updates
+      // Ensure critical fields are preserved
+      text: remoteItem.text || baseItem.text,
+      position: remoteItem.position ?? baseItem.position,
+      id: remoteItem.id || baseItem.id,
       markedBy: Array.from(markedByMap.values()).sort((a, b) => a.markedAt - b.markedAt),
     };
   });

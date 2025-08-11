@@ -17,8 +17,8 @@ interface TileSize {
 }
 
 // Pure function to calculate tile size based on text length
-function calculateTileSize(text: string, seed: number): TileSize {
-  const length = text.length;
+function calculateTileSize(text: string | undefined, seed: number): TileSize {
+  const length = text?.length || 0;
   
   // Use seed for deterministic "randomness" based on item properties
   const variant = seed % 10;
@@ -69,10 +69,16 @@ export const GameBoard = memo(
     // Pre-calculate tile sizes for consistent layout
     const tileSizes = useMemo(() => {
       return items.map((item, index) => {
+        // Handle items without text
+        if (!item?.text) {
+          return { cols: 1, rows: 1 };
+        }
+        
         // Use combination of text content and position for seed
-        const seed = item.text.charCodeAt(0) + 
-                    item.text.charCodeAt(Math.floor(item.text.length / 2)) +
-                    (item.text.charCodeAt(item.text.length - 1) || 0) +
+        const textToUse = item.text || "";
+        const seed = textToUse.charCodeAt(0) + 
+                    textToUse.charCodeAt(Math.floor(textToUse.length / 2)) +
+                    (textToUse.charCodeAt(textToUse.length - 1) || 0) +
                     index;
         
         return calculateTileSize(item.text, seed);
@@ -99,7 +105,7 @@ export const GameBoard = memo(
           const isMarkedByMe = markedPositions.includes(item.position);
           const markedBy = item.markedBy || [];
           const isMarkedByAnyone = markedBy.length > 0;
-          const textLength = item.text.length;
+          const textLength = item.text?.length || 0;
           const tileSize = tileSizes[index];
           
           // Calculate appropriate padding based on tile size and text length
@@ -163,7 +169,7 @@ export const GameBoard = memo(
               }}
             >
               <span className="max-w-full overflow-wrap-anywhere relative z-10">
-                {item.text}
+                {item.text || "(empty)"}
               </span>
               
               {/* Show who marked this square */}

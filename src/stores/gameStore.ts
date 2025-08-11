@@ -758,9 +758,32 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     // Ensure we have a complete game object for merging
     // If latestGame is a partial update, merge it with currentGame first
-    const gameToMerge: Game = latestGame.settings 
-      ? latestGame 
-      : { ...currentGame, ...latestGame };
+    let gameToMerge: Game;
+    
+    if (latestGame.settings) {
+      // Full update - use as is
+      gameToMerge = latestGame;
+    } else {
+      // Partial update - need to carefully merge items
+      // If latestGame has items, merge them properly instead of replacing
+      if (latestGame.items && currentGame.items) {
+        const mergedItems = currentGame.items.map((currentItem, index) => {
+          const updatedItem = latestGame.items?.[index];
+          if (!updatedItem) return currentItem;
+          
+          // Merge the item, preserving all existing fields
+          return {
+            ...currentItem,
+            ...updatedItem,
+            // Ensure text is always preserved from current if not in update
+            text: updatedItem.text || currentItem.text,
+          };
+        });
+        gameToMerge = { ...currentGame, ...latestGame, items: mergedItems };
+      } else {
+        gameToMerge = { ...currentGame, ...latestGame };
+      }
+    }
 
     // Use proper state merging to prevent overwrites
     const mergedGame = mergeGameStates(currentGame, gameToMerge);
