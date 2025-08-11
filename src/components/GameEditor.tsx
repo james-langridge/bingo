@@ -120,7 +120,7 @@ export function GameEditor() {
     );
   }
 
-  const gridSize = currentGame?.settings.gridSize || 5;
+  const gridSize = currentGame?.settings?.gridSize || 5;
   const maxItems = gridSize * gridSize;
 
   return (

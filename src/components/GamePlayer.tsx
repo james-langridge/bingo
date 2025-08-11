@@ -226,7 +226,7 @@ export function GamePlayer() {
     );
   }
 
-  const hasWon = playerState
+  const hasWon = playerState && currentGame.settings
     ? checkWinCondition(
         playerState.markedPositions,
         currentGame.settings.gridSize,
@@ -372,7 +372,7 @@ export function GamePlayer() {
               items={shuffledItems}
               markedPositions={playerState?.markedPositions || []}
               onItemClick={markPosition}
-              gridSize={currentGame.settings.gridSize}
+              gridSize={currentGame.settings?.gridSize || 5}
               currentPlayerId={currentPlayerId || undefined}
               currentPlayerName={playerState?.displayName}
             />

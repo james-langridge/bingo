@@ -490,17 +490,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
       return;
     }
 
-    const hasWon = checkWinCondition(
+    const hasWon = currentGame.settings ? checkWinCondition(
       playerState.markedPositions,
       currentGame.settings.gridSize,
       currentGame.settings.requireFullCard,
-    );
+    ) : false;
 
     console.log("[Multiplayer] Checking for win:", {
       hasWon,
       markedPositions: playerState.markedPositions,
-      gridSize: currentGame.settings.gridSize,
-      requireFullCard: currentGame.settings.requireFullCard,
+      gridSize: currentGame.settings?.gridSize,
+      requireFullCard: currentGame.settings?.requireFullCard,
     });
 
     if (hasWon) {
@@ -756,8 +756,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { currentGame, currentPlayerId, playerState } = get();
     if (!currentGame) return;
 
+    // Ensure we have a complete game object for merging
+    // If latestGame is a partial update, merge it with currentGame first
+    const gameToMerge: Game = latestGame.settings 
+      ? latestGame 
+      : { ...currentGame, ...latestGame };
+
     // Use proper state merging to prevent overwrites
-    const mergedGame = mergeGameStates(currentGame, latestGame);
+    const mergedGame = mergeGameStates(currentGame, gameToMerge);
 
     // Check if there's a new winner
     if (mergedGame.winner && !currentGame.winner) {
@@ -775,7 +781,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         console.log("[Multiplayer] Another player has won the game!");
         
         // Check if we had a winning board (near miss scenario)
-        if (playerState && checkWinCondition(
+        if (playerState && currentGame.settings && checkWinCondition(
           playerState.markedPositions,
           currentGame.settings.gridSize,
           currentGame.settings.requireFullCard,
