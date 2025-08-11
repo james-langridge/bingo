@@ -310,6 +310,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { currentGame, currentPlayerId, playerState } = get();
     if (!currentGame || !playerState || !currentPlayerId) return;
 
+    // Mark activity for immediate polling
+    const syncManager = getSyncManager();
+    if (syncManager) {
+      syncManager.markActivity(true);
+    }
+
     // Optimistic update for both player state and game items
     set(
       produce((draft) => {
@@ -390,9 +396,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       // Check if player has won after marking
       get().checkForWinner();
       
-      // Immediate sync after marking square (vacation mode)
-      console.log("[GameStore] Square marked, syncing immediately");
-      get().refreshGameState();
+      // The sync is now handled by markActivity above
+      console.log("[GameStore] Square marked, polling triggered");
     }
   },
 
@@ -416,6 +421,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
   updatePlayerActivity: async () => {
     const { currentGame, playerState, currentPlayerId } = get();
     if (!currentGame || !playerState || !currentPlayerId) return;
+
+    // Mark activity for polling interval adjustment
+    const syncManager = getSyncManager();
+    if (syncManager) {
+      syncManager.markActivity(false);
+    }
 
     // Only update if player exists in the list
     const playerExists = currentGame.players.some(p => p.id === currentPlayerId);
@@ -507,6 +518,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!currentGame || !playerState || !currentPlayerId) return;
 
     console.log("[Multiplayer] Attempting to announce win...");
+
+    // Trigger immediate poll after win announcement
+    const syncManager = getSyncManager();
+    if (syncManager) {
+      syncManager.markActivity(true);
+    }
 
     // Step 1: Fetch absolute latest game state from server before declaring victory
     let latestGame: Game | null = null;
@@ -657,41 +674,30 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
   },
 
-  // Start polling for game updates (vacation mode - reduced frequency)
+  // Start polling for game updates
   startPolling: () => {
-    const { pollingInterval } = get();
-    if (pollingInterval) return; // Already polling
+    // Polling is now handled by SyncManager with smart intervals
+    console.log("[Polling] Polling is handled by SyncManager");
+    const syncManager = getSyncManager();
+    if (syncManager) {
+      syncManager.pollNow();
+    }
 
-    // Poll every 60 seconds when visible (vacation mode)
+    // Still maintain activity updates for vacation mode
+    const { pollingInterval } = get();
+    if (pollingInterval) return; // Already have activity timer
+
+    // Update player activity periodically (for vacation mode presence)
     const interval = window.setInterval(() => {
-      // Only poll if document is visible
       if (document.visibilityState === 'visible') {
-        // Only poll if not connected to SSE
-        if (!get().isConnected) {
-          get().refreshGameState();
-        }
         get().updatePlayerActivity();
       }
     }, 60000); // 60 seconds for vacation mode
 
     set({ pollingInterval: interval });
-
-    // Also set up visibility change handler for immediate sync on app open
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        // Immediate sync when app becomes visible
-        console.log("[GameStore] App became visible, syncing immediately");
-        get().refreshGameState();
-        get().updatePlayerActivity();
-      }
-    };
-
-    // Store handler so we can clean it up later
-    (window as any).__visibilityHandler = handleVisibilityChange;
-    document.addEventListener('visibilitychange', handleVisibilityChange);
   },
 
-  // Stop polling and disconnect SSE
+  // Stop polling and disconnect
   stopPolling: () => {
     const { pollingInterval } = get();
     if (pollingInterval) {
@@ -699,14 +705,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       set({ pollingInterval: null });
     }
     
-    // Clean up visibility handler
-    const handler = (window as any).__visibilityHandler;
-    if (handler) {
-      document.removeEventListener('visibilitychange', handler);
-      delete (window as any).__visibilityHandler;
-    }
-    
-    // Disconnect SSE
+    // Disconnect SyncManager (which stops polling)
     resetSyncManager();
   },
 

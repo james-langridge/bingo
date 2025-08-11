@@ -2,7 +2,11 @@ import type { Game, PlayerState } from "../types/types";
 
 /**
  * SyncManager handles real-time synchronization of game state
- * using Server-Sent Events (SSE) and conflict resolution
+ * using smart polling with adaptive intervals.
+ * 
+ * Note: SSE (Server-Sent Events) doesn't work on Vercel due to function
+ * timeout limits (10 seconds for hobby, 60 seconds for pro). Instead,
+ * we use intelligent polling that adjusts based on activity.
  */
 
 interface SyncCallbacks {
@@ -12,134 +16,275 @@ interface SyncCallbacks {
   onWinnerAnnounced?: (winnerName: string) => void;
 }
 
+interface PollingState {
+  interval: number;
+  lastActivityTime: number;
+  lastSyncTime: number;
+  lastVersion: string;
+  consecutiveErrors: number;
+}
+
 class SyncManager {
-  private eventSource: EventSource | null = null;
+  private pollingTimer: NodeJS.Timeout | null = null;
   private callbacks: SyncCallbacks;
   private gameCode: string | null = null;
   private isConnected: boolean = false;
-  private reconnectAttempts: number = 0;
-  private maxReconnectAttempts: number = 5;
-  private reconnectDelay: number = 1000;
-  private lastKnownVersion: string = "";
+  private pollingState: PollingState = {
+    interval: 2000, // Start with 2 seconds
+    lastActivityTime: Date.now(),
+    lastSyncTime: 0,
+    lastVersion: "",
+    consecutiveErrors: 0,
+  };
+  
+  // Polling interval configuration
+  private readonly ACTIVE_INTERVAL = 2000;    // 2 seconds during active play
+  private readonly IDLE_INTERVAL = 10000;     // 10 seconds after 1 minute idle
+  private readonly INACTIVE_INTERVAL = 30000; // 30 seconds after 5 minutes idle
+  private readonly IMMEDIATE_POLL_DELAY = 100; // Near-instant poll after user action
+  
+  private visibilityHandler: (() => void) | null = null;
+  private isDocumentVisible: boolean = true;
 
   constructor(callbacks: SyncCallbacks) {
     this.callbacks = callbacks;
+    this.setupVisibilityHandling();
   }
 
   /**
-   * Connect to SSE endpoint for real-time updates
+   * Setup document visibility handling to pause/resume polling
+   */
+  private setupVisibilityHandling() {
+    this.visibilityHandler = () => {
+      const wasVisible = this.isDocumentVisible;
+      this.isDocumentVisible = !document.hidden;
+      
+      if (!wasVisible && this.isDocumentVisible && this.gameCode) {
+        // Tab became visible - immediately poll for updates
+        console.log("[SyncManager] Tab became visible, polling immediately");
+        this.pollNow();
+      } else if (!this.isDocumentVisible) {
+        // Tab became hidden - pause polling
+        console.log("[SyncManager] Tab hidden, pausing polling");
+      }
+    };
+    
+    document.addEventListener("visibilitychange", this.visibilityHandler);
+  }
+
+  /**
+   * Start smart polling for game updates
    */
   connect(gameCode: string) {
-    if (this.eventSource) {
-      this.disconnect();
-    }
-
+    this.disconnect();
+    
     this.gameCode = gameCode;
-    console.log(`[SyncManager] Connecting to game ${gameCode}...`);
+    this.pollingState.lastActivityTime = Date.now();
+    console.log(`[SyncManager] Starting smart polling for game ${gameCode}`);
+    
+    // Start polling immediately
+    this.startPolling();
+  }
 
+  /**
+   * Calculate the appropriate polling interval based on activity
+   */
+  private calculateInterval(): number {
+    const now = Date.now();
+    const timeSinceActivity = now - this.pollingState.lastActivityTime;
+    
+    // If document is hidden, use a longer interval
+    if (!this.isDocumentVisible) {
+      return this.INACTIVE_INTERVAL;
+    }
+    
+    // Active play: < 1 minute since last activity
+    if (timeSinceActivity < 60000) {
+      return this.ACTIVE_INTERVAL;
+    }
+    
+    // Idle: 1-5 minutes since last activity
+    if (timeSinceActivity < 300000) {
+      return this.IDLE_INTERVAL;
+    }
+    
+    // Inactive: > 5 minutes since last activity
+    return this.INACTIVE_INTERVAL;
+  }
+
+  /**
+   * Perform a single poll for game changes
+   */
+  private async poll() {
+    if (!this.gameCode || !this.isDocumentVisible) {
+      return;
+    }
+    
     try {
-      this.eventSource = new EventSource(`/api/sse/${gameCode}`);
-
-      this.eventSource.onopen = () => {
-        console.log("[SyncManager] SSE connection established");
-        this.isConnected = true;
-        this.reconnectAttempts = 0;
-        this.callbacks.onConnectionChange(true);
-      };
-
-      this.eventSource.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          this.handleMessage(data);
-        } catch (error) {
-          console.error("[SyncManager] Failed to parse message:", error);
-        }
-      };
-
-      this.eventSource.onerror = () => {
-        console.error("[SyncManager] SSE connection error");
-        this.isConnected = false;
-        this.callbacks.onConnectionChange(false);
-        
-        // Attempt to reconnect
-        if (this.reconnectAttempts < this.maxReconnectAttempts) {
-          this.reconnectAttempts++;
-          const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-          console.log(`[SyncManager] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})...`);
-          
-          setTimeout(() => {
-            if (this.gameCode) {
-              this.connect(this.gameCode);
-            }
-          }, delay);
-        } else {
-          console.error("[SyncManager] Max reconnection attempts reached");
-          // Fall back to polling
-          this.fallbackToPolling();
-        }
-      };
+      const params = new URLSearchParams({
+        since: this.pollingState.lastSyncTime.toString(),
+        version: this.pollingState.lastVersion,
+      });
+      
+      const response = await fetch(`/api/game/changes/${this.gameCode}?${params}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      
+      if (response.status === 304) {
+        // No changes
+        this.handleSuccessfulPoll();
+        return;
+      }
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
+      const data = await response.json();
+      this.handlePollResponse(data);
+      this.handleSuccessfulPoll();
+      
     } catch (error) {
-      console.error("[SyncManager] Failed to create EventSource:", error);
-      this.fallbackToPolling();
+      this.handlePollError(error);
     }
   }
 
   /**
-   * Handle incoming SSE messages
+   * Handle successful poll response
    */
-  private handleMessage(data: any) {
-    switch (data.type) {
-      case "connected":
-        console.log("[SyncManager] Connected to game:", data.gameCode);
-        break;
-
-      case "gameUpdate":
-        const game = data.game;
-        const currentVersion = JSON.stringify({
-          lastModifiedAt: game.lastModifiedAt,
-          playerCount: game.players?.length,
-          winner: game.winner,
-        });
-
-        // Only process if version changed
-        if (currentVersion !== this.lastKnownVersion) {
-          console.log("[SyncManager] Game update received:", {
-            playerCount: game.players?.length,
-            hasWinner: !!game.winner,
-            timestamp: data.timestamp,
-          });
-
-          this.lastKnownVersion = currentVersion;
-          this.callbacks.onGameUpdate(game);
-
-          // Check for specific events
-          if (game.winner && this.callbacks.onWinnerAnnounced) {
-            this.callbacks.onWinnerAnnounced(game.winner.displayName);
-          }
+  private handlePollResponse(data: any) {
+    const { version, lastModifiedAt, changes, timestamp } = data;
+    
+    // Update version tracking
+    if (version !== this.pollingState.lastVersion) {
+      this.pollingState.lastVersion = version;
+      this.pollingState.lastSyncTime = lastModifiedAt || timestamp;
+      
+      // Process game update
+      if (changes.fullUpdate && changes.game) {
+        console.log("[SyncManager] Full game update received");
+        this.callbacks.onGameUpdate(changes.game);
+        
+        // Check for winner announcement
+        if (changes.game.winner && this.callbacks.onWinnerAnnounced) {
+          this.callbacks.onWinnerAnnounced(changes.game.winner.displayName);
         }
-        break;
-
-      default:
-        console.log("[SyncManager] Unknown message type:", data.type);
+      } else {
+        // Handle incremental update
+        console.log("[SyncManager] Incremental update received");
+        // The store will handle merging the partial data
+        this.callbacks.onGameUpdate({
+          players: changes.players,
+          winner: changes.winner,
+          items: changes.items,
+          lastModifiedAt: lastModifiedAt,
+        } as any);
+      }
     }
   }
 
   /**
-   * Fallback to polling if SSE is not available
+   * Handle successful poll (reset error counter, update connection status)
    */
-  private fallbackToPolling() {
-    console.log("[SyncManager] Falling back to polling mode");
-    // This will be handled by the existing polling mechanism in gameStore
+  private handleSuccessfulPoll() {
+    if (this.pollingState.consecutiveErrors > 0) {
+      this.pollingState.consecutiveErrors = 0;
+      console.log("[SyncManager] Connection restored");
+    }
+    
+    if (!this.isConnected) {
+      this.isConnected = true;
+      this.callbacks.onConnectionChange(true);
+    }
   }
 
   /**
-   * Disconnect from SSE endpoint
+   * Handle polling error
+   */
+  private handlePollError(error: any) {
+    this.pollingState.consecutiveErrors++;
+    console.error("[SyncManager] Polling error:", error);
+    
+    // Mark as disconnected after 3 consecutive errors
+    if (this.pollingState.consecutiveErrors >= 3 && this.isConnected) {
+      this.isConnected = false;
+      this.callbacks.onConnectionChange(false);
+    }
+    
+    // Exponential backoff on errors (max 30 seconds)
+    const backoffInterval = Math.min(
+      this.ACTIVE_INTERVAL * Math.pow(2, this.pollingState.consecutiveErrors),
+      this.INACTIVE_INTERVAL
+    );
+    this.pollingState.interval = backoffInterval;
+  }
+
+  /**
+   * Start the polling loop
+   */
+  private startPolling() {
+    this.stopPolling();
+    
+    const pollAndSchedule = async () => {
+      await this.poll();
+      
+      // Calculate next interval
+      this.pollingState.interval = this.calculateInterval();
+      
+      // Schedule next poll if still connected
+      if (this.gameCode) {
+        this.pollingTimer = setTimeout(pollAndSchedule, this.pollingState.interval);
+      }
+    };
+    
+    // Start immediately
+    pollAndSchedule();
+  }
+
+  /**
+   * Stop polling
+   */
+  private stopPolling() {
+    if (this.pollingTimer) {
+      clearTimeout(this.pollingTimer);
+      this.pollingTimer = null;
+    }
+  }
+
+  /**
+   * Mark activity and optionally trigger immediate poll
+   */
+  markActivity(immediate: boolean = false) {
+    this.pollingState.lastActivityTime = Date.now();
+    
+    if (immediate && this.gameCode) {
+      // Cancel current timer and poll immediately
+      this.stopPolling();
+      setTimeout(() => this.startPolling(), this.IMMEDIATE_POLL_DELAY);
+    }
+  }
+
+  /**
+   * Force an immediate poll
+   */
+  pollNow() {
+    if (this.gameCode) {
+      this.markActivity(true);
+    }
+  }
+
+  /**
+   * Disconnect and cleanup
    */
   disconnect() {
-    if (this.eventSource) {
-      console.log("[SyncManager] Disconnecting SSE...");
-      this.eventSource.close();
-      this.eventSource = null;
+    console.log("[SyncManager] Stopping polling");
+    this.stopPolling();
+    this.gameCode = null;
+    
+    if (this.isConnected) {
       this.isConnected = false;
       this.callbacks.onConnectionChange(false);
     }
@@ -157,8 +302,20 @@ class SyncManager {
    */
   reconnect() {
     if (this.gameCode) {
-      this.disconnect();
-      this.connect(this.gameCode);
+      console.log("[SyncManager] Reconnecting...");
+      this.pollingState.consecutiveErrors = 0;
+      this.startPolling();
+    }
+  }
+  
+  /**
+   * Cleanup event listeners
+   */
+  cleanup() {
+    this.disconnect();
+    if (this.visibilityHandler) {
+      document.removeEventListener("visibilitychange", this.visibilityHandler);
+      this.visibilityHandler = null;
     }
   }
 }
@@ -175,7 +332,7 @@ export function getSyncManager(callbacks?: SyncCallbacks): SyncManager {
 
 export function resetSyncManager() {
   if (syncManagerInstance) {
-    syncManagerInstance.disconnect();
+    syncManagerInstance.cleanup();
     syncManagerInstance = null;
   }
 }
