@@ -121,18 +121,29 @@ export const useGameStore = create<GameStore>((set, get) => ({
   loadGame: async (gameCode) => {
     set({ isLoading: true });
 
-    const game = await loadGameByCode(gameCode);
-    const playerState = await loadPlayerState(gameCode);
+    try {
+      const game = await loadGameByCode(gameCode);
+      const playerState = await loadPlayerState(gameCode);
 
-    set({
-      currentGame: game || null,
-      playerState: playerState || null,
-      lastServerState: game || null,
-      isLoading: false,
-    });
+      // Only proceed if game exists
+      if (!game) {
+        set({
+          currentGame: null,
+          playerState: null,
+          lastServerState: null,
+          isLoading: false,
+        });
+        return;
+      }
 
-    // Connect to real-time updates if we're in a game
-    if (game) {
+      set({
+        currentGame: game,
+        playerState: playerState || null,
+        lastServerState: game,
+        isLoading: false,
+      });
+
+      // Connect to real-time updates if we're in a game
       const syncManager = getSyncManager({
         onGameUpdate: (updatedGame) => get().handleRealtimeUpdate(updatedGame),
         onConnectionChange: (isConnected) => get().setConnectionStatus(isConnected),
@@ -141,11 +152,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
         },
       });
       syncManager.connect(gameCode);
-    }
 
-    // Keep polling as fallback
-    if (game && playerState) {
-      get().startPolling();
+      // Keep polling as fallback
+      if (playerState) {
+        get().startPolling();
+      }
+    } catch (error) {
+      console.error("[GameStore] Failed to load game:", error);
+      set({
+        currentGame: null,
+        playerState: null,
+        lastServerState: null,
+        isLoading: false,
+      });
     }
   },
 
@@ -718,11 +737,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
       // Fetch latest game state from server/Redis
       const latestGame = await loadGameByCode(currentGame.gameCode);
 
+      // Only update if we actually got a game back
       if (latestGame) {
         get().handleRealtimeUpdate(latestGame);
+      } else {
+        // Game might have been deleted or is temporarily unavailable
+        console.warn(`[GameStore] Game ${currentGame.gameCode} not found during refresh`);
+        // Don't throw an error - just skip the update
       }
     } catch (error) {
       console.error("[GameStore] Failed to refresh game state:", error);
+      // Don't throw - just log the error to avoid triggering ErrorBoundary
     }
   },
 

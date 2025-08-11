@@ -307,7 +307,7 @@ export function GameErrorBoundary({ children }: { children: ReactNode }) {
   );
 }
 
-function GameErrorFallback({ reset }: { error: Error; reset: () => void }) {
+function GameErrorFallback({ error, reset }: { error: Error; reset: () => void }) {
   const handleRejoinGame = async () => {
     try {
       // Try to get game code from URL or storage
@@ -325,6 +325,11 @@ function GameErrorFallback({ reset }: { error: Error; reset: () => void }) {
       window.location.href = '/';
     }
   };
+
+  // Check if this is actually a connection error
+  const isConnectionError = error.message?.toLowerCase().includes('fetch') || 
+                          error.message?.toLowerCase().includes('network') ||
+                          error.message?.toLowerCase().includes('connection');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 flex items-center justify-center p-4">
@@ -346,19 +351,31 @@ function GameErrorFallback({ reset }: { error: Error; reset: () => void }) {
         </div>
         
         <h2 className="text-2xl font-bold text-gray-800 mb-2">
-          Game Connection Lost
+          {isConnectionError ? "Game Connection Lost" : "Something Went Wrong"}
         </h2>
         
         <p className="text-gray-600 mb-6">
-          Don't worry! Your game is still there. Let's reconnect!
+          {isConnectionError 
+            ? "Don't worry! Your game is still there. Let's reconnect!"
+            : "We encountered an issue loading the game. Let's try again!"}
         </p>
+
+        {/* Show error details in development */}
+        {import.meta.env.DEV && (
+          <details className="mb-4 text-left">
+            <summary className="cursor-pointer text-sm text-gray-500">Error details</summary>
+            <pre className="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded overflow-auto">
+              {error.message}
+            </pre>
+          </details>
+        )}
         
         <div className="space-y-3">
           <button
             onClick={handleRejoinGame}
             className="w-full px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all font-medium"
           >
-            Rejoin Game
+            {isConnectionError ? "Rejoin Game" : "Try Again"}
           </button>
           
           <button
