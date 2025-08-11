@@ -299,7 +299,13 @@ describe("GameBoard", () => {
     });
 
     test("applies animation style to marked items", () => {
-      render(<GameBoard {...defaultProps} markedPositions={[0]} />);
+      // Update the first item to show it's marked by someone
+      const itemsWithMarks = [
+        { ...mockItems[0], markedBy: [{ playerId: "1", displayName: "Test", markedAt: Date.now() }] },
+        ...mockItems.slice(1)
+      ];
+      
+      render(<GameBoard {...defaultProps} items={itemsWithMarks} markedPositions={[0]} />);
 
       const button = screen.getAllByRole("button")[0];
       expect(button).toHaveStyle({ animation: "pop 0.3s ease-out" });

@@ -1,10 +1,5 @@
 import { memo, useMemo } from "react";
-
-interface BingoItem {
-  id: string;
-  text: string;
-  position: number;
-}
+import type { BingoItem } from "../types/types";
 
 interface GameBoardProps {
   items: readonly BingoItem[];
@@ -12,6 +7,8 @@ interface GameBoardProps {
   gridSize: number;
   onItemClick: (position: number) => void;
   enableHaptic?: boolean;
+  currentPlayerId?: string;
+  currentPlayerName?: string;
 }
 
 interface TileSize {
@@ -99,7 +96,9 @@ export const GameBoard = memo(
         }}
       >
         {items.map((item, index) => {
-          const isMarked = markedPositions.includes(index);
+          const isMarkedByMe = markedPositions.includes(index);
+          const markedBy = item.markedBy || [];
+          const isMarkedByAnyone = markedBy.length > 0;
           const textLength = item.text.length;
           const tileSize = tileSizes[index];
           
@@ -126,6 +125,16 @@ export const GameBoard = memo(
             return '1rem';
           };
 
+          // Get initials for display
+          const getInitials = (name: string) => {
+            return name
+              .split(' ')
+              .map(n => n[0])
+              .join('')
+              .toUpperCase()
+              .slice(0, 2);
+          };
+
           return (
             <button
               key={`${item.id}-${index}`}
@@ -134,17 +143,19 @@ export const GameBoard = memo(
               ${getPadding()} rounded-xl font-medium
               transition-all transform active:scale-95
               min-h-[90px] w-full h-full
-              flex items-center justify-center text-center
+              flex flex-col items-center justify-center text-center
               break-words hyphens-auto
               relative overflow-hidden
               ${
-                isMarked
+                isMarkedByMe
                   ? "bg-gradient-to-br from-purple-500 to-pink-500 text-white shadow-xl scale-[1.02] hover:scale-105"
+                  : isMarkedByAnyone
+                  ? "bg-gradient-to-br from-blue-400 to-cyan-400 text-white shadow-lg hover:scale-105"
                   : "bg-white text-gray-800 shadow-md border-2 border-gray-200 hover:border-purple-300 hover:shadow-lg"
               }
             `}
               style={{
-                animation: isMarked ? "pop 0.3s ease-out" : undefined,
+                animation: isMarkedByAnyone ? "pop 0.3s ease-out" : undefined,
                 gridColumn: `span ${tileSize.cols}`,
                 gridRow: `span ${tileSize.rows}`,
                 fontSize: getFontSize(),
@@ -154,8 +165,39 @@ export const GameBoard = memo(
               <span className="max-w-full overflow-wrap-anywhere relative z-10">
                 {item.text}
               </span>
+              
+              {/* Show who marked this square */}
+              {markedBy.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1 justify-center">
+                  {markedBy.slice(0, 3).map((mark, i) => (
+                    <span
+                      key={i}
+                      className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm text-xs font-bold"
+                      title={`${mark.displayName} - ${new Date(mark.markedAt).toLocaleString()}`}
+                    >
+                      {getInitials(mark.displayName)}
+                    </span>
+                  ))}
+                  {markedBy.length > 3 && (
+                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm text-xs font-bold">
+                      +{markedBy.length - 3}
+                    </span>
+                  )}
+                </div>
+              )}
+              
+              {/* Add "Also saw this!" indicator if marked by others but not me */}
+              {isMarkedByAnyone && !isMarkedByMe && (
+                <div className="absolute top-2 right-2 bg-yellow-400 text-yellow-900 rounded-full p-1" title="Also saw this!">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
+                    <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd"/>
+                  </svg>
+                </div>
+              )}
+              
               {/* Add subtle pattern for large tiles */}
-              {(tileSize.cols > 1 || tileSize.rows > 1) && !isMarked && (
+              {(tileSize.cols > 1 || tileSize.rows > 1) && !isMarkedByAnyone && (
                 <div className="absolute inset-0 opacity-5 pointer-events-none">
                   <div className="w-full h-full bg-gradient-to-br from-purple-500 to-transparent" />
                 </div>

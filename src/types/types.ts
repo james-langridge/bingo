@@ -18,6 +18,16 @@ export interface BingoItem {
   readonly id: string;
   readonly text: string;
   readonly position: number; // Position in grid
+  readonly markedBy?: readonly SquareMark[]; // Who marked this square and when
+}
+
+// NEW: Track who marked each square for vacation mode
+export interface SquareMark {
+  readonly playerId: string;
+  readonly displayName: string;
+  readonly markedAt: number;
+  readonly note?: string; // Optional note about the square
+  readonly photoUrl?: string; // Optional photo proof
 }
 
 export interface GameSettings {

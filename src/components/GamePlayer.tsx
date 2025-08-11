@@ -17,6 +17,7 @@ export function GamePlayer() {
     currentGame,
     playerState,
     nearMissInfo,
+    currentPlayerId,
     loadGame,
     joinGame,
     markPosition,
@@ -372,6 +373,8 @@ export function GamePlayer() {
               markedPositions={playerState?.markedPositions || []}
               onItemClick={markPosition}
               gridSize={currentGame.settings.gridSize}
+              currentPlayerId={currentPlayerId || undefined}
+              currentPlayerName={playerState?.displayName}
             />
           </ErrorBoundary>
 

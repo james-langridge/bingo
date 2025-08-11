@@ -307,16 +307,22 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   markPosition: (position) => {
-    // Optimistic update
+    const { currentGame, currentPlayerId, playerState } = get();
+    if (!currentGame || !playerState || !currentPlayerId) return;
+
+    // Optimistic update for both player state and game items
     set(
       produce((draft) => {
-        if (!draft.playerState) return;
+        if (!draft.playerState || !draft.currentGame) return;
 
         // Save current state for potential rollback
         draft.optimisticState = { ...draft.playerState };
 
+        // Update player's marked positions
         const marked = draft.playerState.markedPositions;
-        if (marked.includes(position)) {
+        const isUnmarking = marked.includes(position);
+        
+        if (isUnmarking) {
           draft.playerState.markedPositions = marked.filter(
             (pos: number) => pos !== position,
           );
@@ -325,14 +331,46 @@ export const useGameStore = create<GameStore>((set, get) => ({
         }
 
         draft.playerState.lastSyncAt = Date.now();
+
+        // Update the item's markedBy array (vacation mode: multiple people can mark)
+        const item = draft.currentGame.items[position];
+        if (item) {
+          const markedBy = item.markedBy || [];
+          const existingMarkIndex = markedBy.findIndex(
+            (mark: any) => mark.playerId === currentPlayerId
+          );
+
+          if (isUnmarking && existingMarkIndex >= 0) {
+            // Remove this player's mark
+            draft.currentGame.items[position] = {
+              ...item,
+              markedBy: markedBy.filter((_: any, i: number) => i !== existingMarkIndex),
+            };
+          } else if (!isUnmarking && existingMarkIndex < 0) {
+            // Add this player's mark
+            const newMark = {
+              playerId: currentPlayerId,
+              displayName: playerState.displayName,
+              markedAt: Date.now(),
+            };
+            draft.currentGame.items[position] = {
+              ...item,
+              markedBy: [...markedBy, newMark],
+            };
+          }
+        }
       }),
     );
 
-    // Save updated player state
-    const { playerState } = get();
-    if (playerState) {
-      savePlayerState(playerState).catch((error) => {
-        console.error("[GameStore] Failed to save player state:", error);
+    // Save updated state
+    const updatedState = get();
+    if (updatedState.playerState && updatedState.currentGame) {
+      // Save both player state and game state
+      Promise.all([
+        savePlayerState(updatedState.playerState),
+        saveGameLocal(updatedState.currentGame),
+      ]).catch((error) => {
+        console.error("[GameStore] Failed to save state:", error);
         // Rollback on failure
         set(
           produce((draft) => {
@@ -343,6 +381,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           }),
         );
       });
+
       // Check if player has won after marking
       get().checkForWinner();
       
