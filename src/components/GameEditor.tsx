@@ -13,6 +13,7 @@ export function GameEditor() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     const loadGame = async () => {
@@ -58,9 +59,9 @@ export function GameEditor() {
     }
   }, [currentGame]);
 
-  const handleAddItem = (e: React.FormEvent) => {
+  const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newItemText.trim()) return;
+    if (!newItemText.trim() || isSaving) return;
 
     const newItem: BingoItem = {
       id: crypto.randomUUID(),
@@ -71,19 +72,27 @@ export function GameEditor() {
     const updatedItems = [...items, newItem];
     setItems(updatedItems);
     setNewItemText("");
+    
+    // Auto-save the items immediately
+    setIsSaving(true);
+    await updateGameItems(updatedItems);
+    setIsSaving(false);
   };
 
-  const handleRemoveItem = (itemId: string) => {
+  const handleRemoveItem = async (itemId: string) => {
+    if (isSaving) return;
+    
     const updatedItems = items
       .filter((item) => item.id !== itemId)
       .map((item, index) => ({ ...item, position: index }));
     setItems(updatedItems);
+    
+    // Auto-save the items immediately
+    setIsSaving(true);
+    await updateGameItems(updatedItems);
+    setIsSaving(false);
   };
 
-  const handleSaveItems = async () => {
-    await updateGameItems(items);
-    alert("Game saved successfully!");
-  };
 
   const handleShareGame = () => {
     setShowShareModal(true);
@@ -145,9 +154,16 @@ export function GameEditor() {
           </div>
 
           <div className="border-t pt-4">
-            <h2 className="text-lg font-semibold mb-2">
-              Add Bingo Items ({items.length}/{maxItems})
-            </h2>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-lg font-semibold">
+                Add Bingo Items ({items.length}/{maxItems})
+              </h2>
+              {isSaving && (
+                <span className="text-sm text-gray-500 animate-pulse">
+                  Saving...
+                </span>
+              )}
+            </div>
             <form onSubmit={handleAddItem} className="flex gap-2 mb-4">
               <input
                 type="text"
@@ -159,10 +175,10 @@ export function GameEditor() {
               />
               <button
                 type="submit"
-                disabled={!newItemText.trim() || items.length >= maxItems}
+                disabled={!newItemText.trim() || items.length >= maxItems || isSaving}
                 className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
-                Add Item
+                {isSaving ? "Saving..." : "Add Item"}
               </button>
             </form>
 
@@ -183,7 +199,8 @@ export function GameEditor() {
                     <span className="flex-1">{item.text}</span>
                     <button
                       onClick={() => handleRemoveItem(item.id)}
-                      className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
+                      disabled={isSaving}
+                      className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm disabled:bg-gray-400 disabled:cursor-not-allowed"
                     >
                       Remove
                     </button>
@@ -192,14 +209,6 @@ export function GameEditor() {
               </div>
             )}
 
-            {items.length > 0 && (
-              <button
-                onClick={handleSaveItems}
-                className="w-full px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-              >
-                Save Game
-              </button>
-            )}
           </div>
         </div>
 
