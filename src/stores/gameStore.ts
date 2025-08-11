@@ -20,6 +20,11 @@ import {
   savePlayerState,
   loadPlayerState,
 } from "../lib/storage";
+import {
+  getSyncManager,
+  resetSyncManager,
+  mergeGameStates,
+} from "../lib/syncManager";
 
 interface GameStore {
   // Immutable state
@@ -34,6 +39,9 @@ interface GameStore {
   isLoading: boolean;
   pollingInterval: number | null;
   currentPlayerId: string | null;
+  isConnected: boolean;
+  optimisticState: PlayerState | null; // For optimistic updates
+  lastServerState: Game | null; // For rollback
 
   // Actions (thin layer over calculations)
   createGame: (title: string) => Promise<Game>;
@@ -54,6 +62,8 @@ interface GameStore {
   startPolling: () => void;
   stopPolling: () => void;
   refreshGameState: () => Promise<void>;
+  handleRealtimeUpdate: (game: Game) => void;
+  setConnectionStatus: (isConnected: boolean) => void;
 
   // Initialize store
   initialize: () => Promise<void>;
@@ -66,6 +76,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   isLoading: false,
   pollingInterval: null,
   currentPlayerId: null,
+  isConnected: false,
+  optimisticState: null,
+  lastServerState: null,
 
   createGame: async (title) => {
     const game: Game = {
@@ -106,10 +119,23 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({
       currentGame: game || null,
       playerState: playerState || null,
+      lastServerState: game || null,
       isLoading: false,
     });
 
-    // Start polling if we're in a game
+    // Connect to real-time updates if we're in a game
+    if (game) {
+      const syncManager = getSyncManager({
+        onGameUpdate: (updatedGame) => get().handleRealtimeUpdate(updatedGame),
+        onConnectionChange: (isConnected) => get().setConnectionStatus(isConnected),
+        onWinnerAnnounced: (winnerName) => {
+          console.log(`[GameStore] Winner announced: ${winnerName}`);
+        },
+      });
+      syncManager.connect(gameCode);
+    }
+
+    // Keep polling as fallback
     if (game && playerState) {
       get().startPolling();
     }
@@ -186,19 +212,21 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const playerId = crypto.randomUUID();
     set({ currentPlayerId: playerId });
 
-    // Check if player with same name already exists (returning player)
-    const existingPlayer = game.players.find(
+    // Use a more robust player identification
+    // Players are unique by displayName within a game
+    const existingPlayerIndex = game.players.findIndex(
       (p) => p.displayName === displayName,
     );
 
-    let updatedPlayers;
-    if (existingPlayer) {
+    let updatedPlayers = [...game.players];
+    if (existingPlayerIndex >= 0) {
       // Update existing player's info (they're back!)
-      updatedPlayers = game.players.map((p) =>
-        p.displayName === displayName
-          ? { ...p, id: playerId, lastSeenAt: Date.now(), isOnline: true }
-          : p,
-      );
+      updatedPlayers[existingPlayerIndex] = {
+        ...updatedPlayers[existingPlayerIndex],
+        id: playerId,
+        lastSeenAt: Date.now(),
+        isOnline: true,
+      };
     } else {
       // New player joining for the first time
       const newPlayer: Player = {
@@ -209,7 +237,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         hasWon: false,
         isOnline: true,
       };
-      updatedPlayers = [...game.players, newPlayer];
+      updatedPlayers.push(newPlayer);
     }
 
     const updatedGame: Game = {
@@ -245,7 +273,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         displayName,
         markedPositions: [],
         lastSyncAt: Date.now(),
-        hasWon: existingPlayer?.hasWon || false,
+        hasWon: existingPlayerIndex >= 0 ? updatedPlayers[existingPlayerIndex].hasWon : false,
       };
       await savePlayerState(playerState);
     }
@@ -253,16 +281,31 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({
       currentGame: updatedGame,
       playerState,
+      lastServerState: updatedGame,
     });
 
-    // Start polling for updates
+    // Connect to real-time updates
+    const syncManager = getSyncManager({
+      onGameUpdate: (updatedGame) => get().handleRealtimeUpdate(updatedGame),
+      onConnectionChange: (isConnected) => get().setConnectionStatus(isConnected),
+      onWinnerAnnounced: (winnerName) => {
+        console.log(`[GameStore] Winner announced: ${winnerName}`);
+      },
+    });
+    syncManager.connect(gameCode);
+
+    // Start polling as fallback
     get().startPolling();
   },
 
   markPosition: (position) => {
+    // Optimistic update
     set(
       produce((draft) => {
         if (!draft.playerState) return;
+
+        // Save current state for potential rollback
+        draft.optimisticState = { ...draft.playerState };
 
         const marked = draft.playerState.markedPositions;
         if (marked.includes(position)) {
@@ -280,7 +323,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // Save updated player state
     const { playerState } = get();
     if (playerState) {
-      savePlayerState(playerState);
+      savePlayerState(playerState).catch((error) => {
+        console.error("[GameStore] Failed to save player state:", error);
+        // Rollback on failure
+        set(
+          produce((draft) => {
+            if (draft.optimisticState) {
+              draft.playerState = draft.optimisticState;
+              draft.optimisticState = null;
+            }
+          }),
+        );
+      });
       // Check if player has won after marking
       get().checkForWinner();
     }
@@ -419,32 +473,37 @@ export const useGameStore = create<GameStore>((set, get) => ({
     });
   },
 
-  // Start polling for game updates
+  // Start polling for game updates (fallback for SSE)
   startPolling: () => {
     const { pollingInterval } = get();
     if (pollingInterval) return; // Already polling
 
-    // Poll every 2 seconds for updates (faster for better UX)
+    // Poll every 5 seconds as fallback (SSE handles real-time)
     const interval = window.setInterval(() => {
-      get().refreshGameState();
+      // Only poll if not connected to SSE
+      if (!get().isConnected) {
+        get().refreshGameState();
+      }
       get().updatePlayerActivity();
-    }, 2000);
+    }, 5000);
 
     set({ pollingInterval: interval });
   },
 
-  // Stop polling
+  // Stop polling and disconnect SSE
   stopPolling: () => {
     const { pollingInterval } = get();
     if (pollingInterval) {
       clearInterval(pollingInterval);
       set({ pollingInterval: null });
     }
+    // Disconnect SSE
+    resetSyncManager();
   },
 
   // Refresh game state to get latest updates from Redis
   refreshGameState: async () => {
-    const { currentGame, currentPlayerId, playerState } = get();
+    const { currentGame } = get();
     if (!currentGame) return;
 
     try {
@@ -452,58 +511,78 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const latestGame = await loadGameByCode(currentGame.gameCode);
 
       if (latestGame) {
-        // Check if there's a new winner
-        if (latestGame.winner && !currentGame.winner) {
-          console.log("[Multiplayer] New winner detected:", latestGame.winner);
-          // If someone else won, update our player state
-          if (latestGame.winner.displayName !== playerState?.displayName) {
-            console.log("[Multiplayer] Another player has won the game!");
-          }
-        }
-
-        // Check if new players joined
-        const currentPlayerCount = currentGame.players?.length || 0;
-        const latestPlayerCount = latestGame.players?.length || 0;
-        if (latestPlayerCount > currentPlayerCount) {
-          console.log(`[Multiplayer] New players joined! (${currentPlayerCount} -> ${latestPlayerCount})`);
-        }
-
-        // Mark currently active players
-        const now = Date.now();
-        const onlineThreshold = 10000; // Consider "online" if seen in last 10 seconds
-
-        const updatedPlayers = latestGame.players.map((p) => ({
-          ...p,
-          isOnline:
-            p.id === currentPlayerId
-              ? true
-              : now - (p.lastSeenAt || 0) < onlineThreshold,
-        }));
-
-        // Create updated game with preserved admin token if it exists
-        const updatedGame: Game = {
-          ...latestGame,
-          players: updatedPlayers,
-          ...(currentGame.adminToken ? { adminToken: currentGame.adminToken } : {}),
-        };
-
-        // Update the entire game state including winner and players list
-        set({ currentGame: updatedGame });
-
-        // If we detect a winner and it's us, update our player state
-        if (latestGame.winner && 
-            latestGame.winner.displayName === playerState?.displayName && 
-            !playerState.hasWon) {
-          set(produce(draft => {
-            if (draft.playerState) {
-              draft.playerState.hasWon = true;
-            }
-          }));
-        }
+        get().handleRealtimeUpdate(latestGame);
       }
     } catch (error) {
       console.error("[GameStore] Failed to refresh game state:", error);
     }
+  },
+
+  // Handle real-time updates from SSE or polling
+  handleRealtimeUpdate: (latestGame: Game) => {
+    const { currentGame, currentPlayerId, playerState } = get();
+    if (!currentGame) return;
+
+    // Use proper state merging to prevent overwrites
+    const mergedGame = mergeGameStates(currentGame, latestGame);
+
+    // Check if there's a new winner
+    if (mergedGame.winner && !currentGame.winner) {
+      console.log("[Multiplayer] New winner detected:", mergedGame.winner);
+      // If someone else won, update our player state
+      if (mergedGame.winner.displayName !== playerState?.displayName) {
+        console.log("[Multiplayer] Another player has won the game!");
+      }
+    }
+
+    // Check if new players joined
+    const currentPlayerCount = currentGame.players?.length || 0;
+    const latestPlayerCount = mergedGame.players?.length || 0;
+    if (latestPlayerCount > currentPlayerCount) {
+      console.log(`[Multiplayer] New players joined! (${currentPlayerCount} -> ${latestPlayerCount})`);
+    }
+
+    // Mark currently active players
+    const now = Date.now();
+    const onlineThreshold = 15000; // Consider "online" if seen in last 15 seconds
+
+    const updatedPlayers = mergedGame.players.map((p) => ({
+      ...p,
+      isOnline:
+        p.id === currentPlayerId
+          ? true
+          : now - (p.lastSeenAt || 0) < onlineThreshold,
+    }));
+
+    // Create updated game with preserved admin token if it exists
+    const updatedGame: Game = {
+      ...mergedGame,
+      players: updatedPlayers,
+      ...(currentGame.adminToken ? { adminToken: currentGame.adminToken } : {}),
+    };
+
+    // Update the entire game state including winner and players list
+    set({ 
+      currentGame: updatedGame,
+      lastServerState: updatedGame,
+    });
+
+    // If we detect a winner and it's us, update our player state
+    if (mergedGame.winner && 
+        mergedGame.winner.displayName === playerState?.displayName && 
+        !playerState.hasWon) {
+      set(produce(draft => {
+        if (draft.playerState) {
+          draft.playerState.hasWon = true;
+        }
+      }));
+    }
+  },
+
+  // Set connection status
+  setConnectionStatus: (isConnected: boolean) => {
+    set({ isConnected });
+    console.log(`[GameStore] Connection status: ${isConnected ? "Connected" : "Disconnected"}`);
   },
 
   initialize: async () => {
