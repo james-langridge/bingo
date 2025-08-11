@@ -47,7 +47,7 @@ describe("GameBoard", () => {
 
       const grid = container.querySelector(".grid");
       expect(grid).toHaveStyle({ 
-        gridAutoRows: "min-content",
+        gridAutoRows: "minmax(90px, auto)",
         gridAutoFlow: "dense" 
       });
     });
@@ -66,7 +66,7 @@ describe("GameBoard", () => {
       const grid = container.querySelector(".grid");
       // Check that grid has responsive auto-fit columns
       expect(grid).toHaveStyle({ 
-        gridAutoRows: "min-content",
+        gridAutoRows: "minmax(90px, auto)",
         gridAutoFlow: "dense" 
       });
 
@@ -285,7 +285,7 @@ describe("GameBoard", () => {
       render(<GameBoard {...defaultProps} />);
 
       const button = screen.getAllByRole("button")[0];
-      expect(button.className).toContain("min-h-[80px]");
+      expect(button.className).toContain("min-h-[90px]");
       expect(button.className).toContain("rounded-xl");
       expect(button.className).toContain("font-medium");
     });
