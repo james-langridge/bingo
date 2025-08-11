@@ -333,8 +333,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
         draft.playerState.lastSyncAt = Date.now();
 
         // Update the item's markedBy array (vacation mode: multiple people can mark)
-        const item = draft.currentGame.items[position];
-        if (item) {
+        // Find the item by its position property, not array index!
+        const itemIndex = draft.currentGame.items.findIndex(
+          (item: any) => item.position === position
+        );
+        
+        if (itemIndex >= 0) {
+          const item = draft.currentGame.items[itemIndex];
           const markedBy = item.markedBy || [];
           const existingMarkIndex = markedBy.findIndex(
             (mark: any) => mark.playerId === currentPlayerId
@@ -342,7 +347,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
           if (isUnmarking && existingMarkIndex >= 0) {
             // Remove this player's mark
-            draft.currentGame.items[position] = {
+            draft.currentGame.items[itemIndex] = {
               ...item,
               markedBy: markedBy.filter((_: any, i: number) => i !== existingMarkIndex),
             };
@@ -353,7 +358,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
               displayName: playerState.displayName,
               markedAt: Date.now(),
             };
-            draft.currentGame.items[position] = {
+            draft.currentGame.items[itemIndex] = {
               ...item,
               markedBy: [...markedBy, newMark],
             };

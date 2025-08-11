@@ -96,7 +96,7 @@ export const GameBoard = memo(
         }}
       >
         {items.map((item, index) => {
-          const isMarkedByMe = markedPositions.includes(index);
+          const isMarkedByMe = markedPositions.includes(item.position);
           const markedBy = item.markedBy || [];
           const isMarkedByAnyone = markedBy.length > 0;
           const textLength = item.text.length;
@@ -138,7 +138,7 @@ export const GameBoard = memo(
           return (
             <button
               key={`${item.id}-${index}`}
-              onClick={() => handleClick(index)}
+              onClick={() => handleClick(item.position)}
               className={`
               ${getPadding()} rounded-xl font-medium
               transition-all transform active:scale-95
