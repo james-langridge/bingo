@@ -489,6 +489,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           currentGame: latestGame,
           lastServerState: latestGame,
           playerState: { ...playerState, hasWon: true },
+          nearMissInfo: null, // Clear any near-miss notification since we're the winner
         });
         return; // We already won, no need to claim again
       }
@@ -571,6 +572,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
             currentGame: confirmedGame,
             lastServerState: confirmedGame,
             optimisticWinClaim: false,
+            nearMissInfo: null, // Clear any near-miss notification since we won
           });
         } else if (result.actualWinner) {
           console.log("[Multiplayer] Win claim rejected. Actual winner:", result.actualWinner.displayName);
@@ -663,8 +665,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // Check if there's a new winner
     if (mergedGame.winner && !currentGame.winner) {
       console.log("[Multiplayer] New winner detected:", mergedGame.winner);
-      // If someone else won, show near-miss notification if we were close
-      if (mergedGame.winner.displayName !== playerState?.displayName) {
+      
+      // Check if WE are the winner
+      if (mergedGame.winner.displayName === playerState?.displayName) {
+        console.log("[Multiplayer] We are the winner! Clearing any near-miss notifications.");
+        // Clear any near-miss notification since we're the winner
+        set(produce(draft => {
+          draft.nearMissInfo = null;
+        }));
+      } else {
+        // Someone else won, show near-miss notification if we were close
         console.log("[Multiplayer] Another player has won the game!");
         
         // Check if we had a winning board (near miss scenario)
