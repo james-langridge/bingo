@@ -45,6 +45,12 @@ describe("storage", () => {
   beforeAll(() => {
     // Mock fetch globally for all tests
     global.fetch = vi.fn();
+    
+    // Mock navigator.onLine to be false by default for tests
+    Object.defineProperty(navigator, 'onLine', {
+      writable: true,
+      value: false
+    });
   });
 
   afterAll(() => {
@@ -66,6 +72,12 @@ describe("storage", () => {
         headers: { "Content-Type": "application/json" },
       })
     );
+    
+    // Set offline by default for tests
+    Object.defineProperty(navigator, 'onLine', {
+      writable: true,
+      value: false
+    });
   });
 
   afterEach(() => {

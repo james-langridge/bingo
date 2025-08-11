@@ -181,25 +181,35 @@ export async function loadGameByCode(
 ): Promise<Game | undefined> {
   console.log(`[Storage] Loading game ${gameCode}...`);
 
-  // Try local first (instant response)
-  let game = await db.games.where("gameCode").equals(gameCode).first();
+  // Get local version first as fallback
+  let localGame = await db.games.where("gameCode").equals(gameCode).first();
 
-  if (game) {
-    console.log(`[Storage] ✅ Game ${gameCode} found in local cache`);
+  if (navigator.onLine) {
+    // When online, always try to get the latest from server
+    const serverGame = await fetchGameFromServer(gameCode);
+    if (serverGame) {
+      // Server version is the source of truth
+      // Merge local changes if needed (preserve local admin token if it exists)
+      const mergedGame = localGame?.adminToken 
+        ? { ...serverGame, adminToken: localGame.adminToken }
+        : serverGame;
+      
+      // Cache the latest version locally
+      await db.games.put(mergedGame);
+      console.log(
+        `[Storage] ✅ Game ${gameCode} fetched from server (${serverGame.players?.length || 0} players)`,
+      );
+      return mergedGame;
+    } else if (localGame) {
+      // Server fetch failed but we have local version
+      console.log(`[Storage] ⚠️ Using local cache for game ${gameCode}`);
+      return localGame;
+    }
   } else {
-    console.log(`[Storage] Game ${gameCode} not in local cache`);
-
-    if (navigator.onLine) {
-      // Not found locally, try server
-      const serverGame = await fetchGameFromServer(gameCode);
-      if (serverGame) {
-        // Cache locally for offline play
-        await db.games.put(serverGame);
-        game = serverGame;
-        console.log(
-          `[Storage] 💾 Game ${gameCode} cached locally for offline play`,
-        );
-      }
+    // Offline - use local version if available
+    if (localGame) {
+      console.log(`[Storage] ✅ Game ${gameCode} loaded from local cache (offline)`);
+      return localGame;
     } else {
       console.log(
         `[Storage] ⚠️ Offline - cannot fetch game ${gameCode} from server`,
@@ -207,7 +217,7 @@ export async function loadGameByCode(
     }
   }
 
-  return game;
+  return undefined;
 }
 
 export async function loadGameByAdminToken(

@@ -16,6 +16,12 @@ describe("gameStore", () => {
   beforeAll(() => {
     // Mock fetch globally for all tests
     global.fetch = vi.fn();
+    
+    // Mock navigator.onLine to be false by default for tests
+    Object.defineProperty(navigator, 'onLine', {
+      writable: true,
+      value: false
+    });
   });
 
   afterAll(() => {
@@ -34,6 +40,8 @@ describe("gameStore", () => {
       playerState: null,
       localGames: [],
       isLoading: false,
+      pollingInterval: null,
+      currentPlayerId: null,
     });
 
     // Reset fetch mock for each test
@@ -45,9 +53,20 @@ describe("gameStore", () => {
         headers: { "Content-Type": "application/json" },
       })
     );
+    
+    // Set offline by default for tests (to use local storage only)
+    Object.defineProperty(navigator, 'onLine', {
+      writable: true,
+      value: false
+    });
   });
 
   afterEach(() => {
+    // Stop any polling intervals
+    const state = useGameStore.getState();
+    if (state.pollingInterval) {
+      clearInterval(state.pollingInterval);
+    }
     vi.clearAllMocks();
   });
 

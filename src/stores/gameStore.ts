@@ -178,6 +178,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   joinGame: async (gameCode, displayName) => {
+    // Always fetch the latest game state from server first
     const game = await loadGameByCode(gameCode);
     if (!game) throw new Error("Game not found");
 
@@ -217,8 +218,24 @@ export const useGameStore = create<GameStore>((set, get) => ({
       lastModifiedAt: Date.now(),
     };
 
-    // Save updated game with new/returning player
+    // Save updated game with new/returning player - this will sync to Redis
     await saveGameLocal(updatedGame);
+
+    // Force immediate sync to server
+    if (navigator.onLine) {
+      try {
+        const response = await fetch(`/api/game/${gameCode}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatedGame),
+        });
+        if (response.ok) {
+          console.log("[GameStore] Player join synced to server immediately");
+        }
+      } catch (error) {
+        console.error("[GameStore] Failed to sync player join:", error);
+      }
+    }
 
     // Create or restore player state
     let playerState = await loadPlayerState(gameCode);
@@ -290,6 +307,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { currentGame, playerState, currentPlayerId } = get();
     if (!currentGame || !playerState || !currentPlayerId) return;
 
+    // Only update if player exists in the list
+    const playerExists = currentGame.players.some(p => p.id === currentPlayerId);
+    if (!playerExists) {
+      console.log("[GameStore] Player not in list, skipping activity update");
+      return;
+    }
+
     const updatedPlayers = currentGame.players.map((p) =>
       p.id === currentPlayerId
         ? { ...p, lastSeenAt: Date.now(), isOnline: true }
@@ -302,8 +326,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
       lastModifiedAt: Date.now(),
     };
 
+    // Save locally - this will also sync to server in background
     await saveGameLocal(updatedGame);
-    set({ currentGame: updatedGame });
+    
+    // Don't update local state here to avoid conflicts with refreshGameState
+    // The next refresh will pull the updated state
   },
 
   // Check if current player has won
@@ -366,8 +393,25 @@ export const useGameStore = create<GameStore>((set, get) => ({
       lastModifiedAt: Date.now(),
     };
 
+    // Save locally first
     await saveGameLocal(updatedGame);
     console.log("[Multiplayer] Game updated with winner, syncing to Redis...");
+
+    // Force immediate sync to server so other players see the winner
+    if (navigator.onLine) {
+      try {
+        const response = await fetch(`/api/game/${currentGame.gameCode}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatedGame),
+        });
+        if (response.ok) {
+          console.log("[Multiplayer] Winner announcement synced to server!");
+        }
+      } catch (error) {
+        console.error("[Multiplayer] Failed to sync winner announcement:", error);
+      }
+    }
 
     set({
       currentGame: updatedGame,
@@ -400,7 +444,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   // Refresh game state to get latest updates from Redis
   refreshGameState: async () => {
-    const { currentGame, currentPlayerId } = get();
+    const { currentGame, currentPlayerId, playerState } = get();
     if (!currentGame) return;
 
     try {
@@ -411,9 +455,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
         // Check if there's a new winner
         if (latestGame.winner && !currentGame.winner) {
           console.log("[Multiplayer] New winner detected:", latestGame.winner);
+          // If someone else won, update our player state
+          if (latestGame.winner.displayName !== playerState?.displayName) {
+            console.log("[Multiplayer] Another player has won the game!");
+          }
         }
 
-        // Mark currently active players (optional enhancement)
+        // Check if new players joined
+        const currentPlayerCount = currentGame.players?.length || 0;
+        const latestPlayerCount = latestGame.players?.length || 0;
+        if (latestPlayerCount > currentPlayerCount) {
+          console.log(`[Multiplayer] New players joined! (${currentPlayerCount} -> ${latestPlayerCount})`);
+        }
+
+        // Mark currently active players
         const now = Date.now();
         const onlineThreshold = 10000; // Consider "online" if seen in last 10 seconds
 
@@ -425,13 +480,26 @@ export const useGameStore = create<GameStore>((set, get) => ({
               : now - (p.lastSeenAt || 0) < onlineThreshold,
         }));
 
+        // Create updated game with preserved admin token if it exists
         const updatedGame: Game = {
           ...latestGame,
           players: updatedPlayers,
+          ...(currentGame.adminToken ? { adminToken: currentGame.adminToken } : {}),
         };
 
-        // Update the entire game state including winner
+        // Update the entire game state including winner and players list
         set({ currentGame: updatedGame });
+
+        // If we detect a winner and it's us, update our player state
+        if (latestGame.winner && 
+            latestGame.winner.displayName === playerState?.displayName && 
+            !playerState.hasWon) {
+          set(produce(draft => {
+            if (draft.playerState) {
+              draft.playerState.hasWon = true;
+            }
+          }));
+        }
       }
     } catch (error) {
       console.error("[GameStore] Failed to refresh game state:", error);
