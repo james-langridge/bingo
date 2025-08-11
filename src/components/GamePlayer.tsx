@@ -308,12 +308,20 @@ export function GamePlayer() {
                 </span>
               </p>
             </div>
-            <button
-              onClick={clearMarkedPositions}
-              className="mt-3 sm:mt-0 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
-            >
-              Clear Board
-            </button>
+            <div className="flex gap-2 mt-3 sm:mt-0">
+              <button
+                onClick={() => navigate("/")}
+                className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+              >
+                Home
+              </button>
+              <button
+                onClick={clearMarkedPositions}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+              >
+                Clear Board
+              </button>
+            </div>
           </div>
 
           {/* Players list sidebar */}

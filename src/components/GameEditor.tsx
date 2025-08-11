@@ -139,6 +139,12 @@ export function GameEditor() {
             </div>
             <div className="flex gap-2">
               <button
+                onClick={() => navigate("/")}
+                className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+              >
+                Home
+              </button>
+              <button
                 onClick={handleShareGame}
                 className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
               >
