@@ -345,6 +345,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
       });
       // Check if player has won after marking
       get().checkForWinner();
+      
+      // Immediate sync after marking square (vacation mode)
+      console.log("[GameStore] Square marked, syncing immediately");
+      get().refreshGameState();
     }
   },
 
@@ -609,21 +613,38 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
   },
 
-  // Start polling for game updates (fallback for SSE)
+  // Start polling for game updates (vacation mode - reduced frequency)
   startPolling: () => {
     const { pollingInterval } = get();
     if (pollingInterval) return; // Already polling
 
-    // Poll every 5 seconds as fallback (SSE handles real-time)
+    // Poll every 60 seconds when visible (vacation mode)
     const interval = window.setInterval(() => {
-      // Only poll if not connected to SSE
-      if (!get().isConnected) {
-        get().refreshGameState();
+      // Only poll if document is visible
+      if (document.visibilityState === 'visible') {
+        // Only poll if not connected to SSE
+        if (!get().isConnected) {
+          get().refreshGameState();
+        }
+        get().updatePlayerActivity();
       }
-      get().updatePlayerActivity();
-    }, 5000);
+    }, 60000); // 60 seconds for vacation mode
 
     set({ pollingInterval: interval });
+
+    // Also set up visibility change handler for immediate sync on app open
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Immediate sync when app becomes visible
+        console.log("[GameStore] App became visible, syncing immediately");
+        get().refreshGameState();
+        get().updatePlayerActivity();
+      }
+    };
+
+    // Store handler so we can clean it up later
+    (window as any).__visibilityHandler = handleVisibilityChange;
+    document.addEventListener('visibilitychange', handleVisibilityChange);
   },
 
   // Stop polling and disconnect SSE
@@ -633,6 +654,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
       clearInterval(pollingInterval);
       set({ pollingInterval: null });
     }
+    
+    // Clean up visibility handler
+    const handler = (window as any).__visibilityHandler;
+    if (handler) {
+      document.removeEventListener('visibilitychange', handler);
+      delete (window as any).__visibilityHandler;
+    }
+    
     // Disconnect SSE
     resetSyncManager();
   },
