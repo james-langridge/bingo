@@ -151,6 +151,12 @@ async function syncPlayerStateToServer(state: PlayerState): Promise<boolean> {
 
 // Pure functions for data operations
 export async function saveGameLocal(game: Game): Promise<void> {
+  // Validate game object before saving
+  if (!game || !game.id || !game.gameCode) {
+    console.error("[Storage] Invalid game object, skipping save:", game);
+    return;
+  }
+
   // Save to IndexedDB first (immediate feedback)
   await db.games.put(game);
 
@@ -215,6 +221,12 @@ export async function deleteGameLocal(gameId: string): Promise<void> {
 }
 
 export async function savePlayerState(playerState: PlayerState): Promise<void> {
+  // Validate player state before saving
+  if (!playerState || !playerState.gameCode) {
+    console.error("[Storage] Invalid player state, skipping save:", playerState);
+    return;
+  }
+
   // Save locally first
   await db.playerStates.put(playerState);
 

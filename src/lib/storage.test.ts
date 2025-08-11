@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, vi, afterEach } from "vitest";
+import { describe, test, expect, beforeEach, vi, afterEach, beforeAll, afterAll } from "vitest";
 import "fake-indexeddb/auto";
 import {
   db,
@@ -42,15 +42,34 @@ const mockPlayerState: PlayerState = {
 };
 
 describe("storage", () => {
+  beforeAll(() => {
+    // Mock fetch globally for all tests
+    global.fetch = vi.fn();
+  });
+
+  afterAll(() => {
+    vi.restoreAllMocks();
+  });
+
   beforeEach(async () => {
     // Clear database before each test
     await db.games.clear();
     await db.playerStates.clear();
     await db.pendingEvents.clear();
+    
+    // Reset fetch mock for each test
+    vi.mocked(global.fetch).mockReset();
+    // Default to successful responses
+    vi.mocked(global.fetch).mockResolvedValue(
+      new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })
+    );
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    vi.clearAllMocks();
   });
 
   describe("saveGameLocal", () => {
@@ -94,7 +113,7 @@ describe("storage", () => {
 
       const games = await loadLocalGames();
       expect(games).toHaveLength(2);
-      expect(games.map((g) => g.id)).toContain("game-123");
+      expect(games.map((g) => g.id)).toContain("test-id-123");
       expect(games.map((g) => g.id)).toContain("game-456");
     });
 
@@ -107,6 +126,20 @@ describe("storage", () => {
 
   describe("loadGameByCode", () => {
     test("returns undefined when game not found", async () => {
+      // Mock online state
+      Object.defineProperty(navigator, "onLine", {
+        writable: true,
+        value: true,
+      });
+      
+      // Mock fetch to return 404 for this test
+      vi.mocked(global.fetch).mockResolvedValueOnce(
+        new Response(null, {
+          status: 404,
+          statusText: "Not Found",
+        })
+      );
+      
       const game = await loadGameByCode("NOTFOUND");
       expect(game).toBeUndefined();
     });
@@ -133,6 +166,21 @@ describe("storage", () => {
 
     test("is case sensitive", async () => {
       await saveGameLocal(mockGame);
+      
+      // Mock online state
+      Object.defineProperty(navigator, "onLine", {
+        writable: true,
+        value: true,
+      });
+      
+      // Mock fetch to return 404 for this test
+      vi.mocked(global.fetch).mockResolvedValueOnce(
+        new Response(null, {
+          status: 404,
+          statusText: "Not Found",
+        })
+      );
+      
       const game = await loadGameByCode("abc123");
       expect(game).toBeUndefined();
     });
@@ -147,7 +195,7 @@ describe("storage", () => {
     test("returns game with matching admin token", async () => {
       await saveGameLocal(mockGame);
       const game = await loadGameByAdminToken(
-        "admin123456789012345678901234567",
+        "test-admin-token-32chars1234567890ab",
       );
       expect(game).toEqual(mockGame);
     });
@@ -172,7 +220,7 @@ describe("storage", () => {
   describe("deleteGameLocal", () => {
     test("deletes game by ID", async () => {
       await saveGameLocal(mockGame);
-      await deleteGameLocal("game-123");
+      await deleteGameLocal("test-id-123");
 
       const games = await loadLocalGames();
       expect(games).toHaveLength(0);
@@ -183,7 +231,7 @@ describe("storage", () => {
       await saveGameLocal(mockGame);
       await saveGameLocal(game2);
 
-      await deleteGameLocal("game-123");
+      await deleteGameLocal("test-id-123");
 
       const games = await loadLocalGames();
       expect(games).toHaveLength(1);

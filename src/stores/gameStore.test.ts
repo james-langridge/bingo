@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, vi, afterEach } from "vitest";
+import { describe, test, expect, beforeEach, vi, afterEach, beforeAll, afterAll } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
 import "fake-indexeddb/auto";
 import { useGameStore } from "./gameStore";
@@ -13,6 +13,15 @@ vi.mock("crypto", () => ({
 }));
 
 describe("gameStore", () => {
+  beforeAll(() => {
+    // Mock fetch globally for all tests
+    global.fetch = vi.fn();
+  });
+
+  afterAll(() => {
+    vi.restoreAllMocks();
+  });
+
   beforeEach(async () => {
     // Clear database and reset store before each test
     await db.games.clear();
@@ -26,6 +35,16 @@ describe("gameStore", () => {
       localGames: [],
       isLoading: false,
     });
+
+    // Reset fetch mock for each test
+    vi.mocked(global.fetch).mockReset();
+    // Default to successful responses
+    vi.mocked(global.fetch).mockResolvedValue(
+      new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })
+    );
   });
 
   afterEach(() => {
@@ -152,6 +171,14 @@ describe("gameStore", () => {
     test("sets currentGame to null if game not found", async () => {
       const { result } = renderHook(() => useGameStore());
 
+      // Mock fetch to return 404 for this test
+      vi.mocked(global.fetch).mockResolvedValueOnce(
+        new Response(null, {
+          status: 404,
+          statusText: "Not Found",
+        })
+      );
+
       await act(async () => {
         await result.current.loadGame("NOTFOUND");
       });
@@ -161,6 +188,14 @@ describe("gameStore", () => {
 
     test("sets loading state correctly", async () => {
       const { result } = renderHook(() => useGameStore());
+
+      // Mock fetch to return 404 for this test
+      vi.mocked(global.fetch).mockResolvedValueOnce(
+        new Response(null, {
+          status: 404,
+          statusText: "Not Found",
+        })
+      );
 
       await act(async () => {
         await result.current.loadGame("ANYCODE");
@@ -400,6 +435,14 @@ describe("gameStore", () => {
 
     test("throws error if game not found", async () => {
       const { result } = renderHook(() => useGameStore());
+
+      // Mock fetch to return 404 for non-existent game
+      vi.mocked(global.fetch).mockResolvedValueOnce(
+        new Response(null, {
+          status: 404,
+          statusText: "Not Found",
+        })
+      );
 
       await expect(
         act(async () => {
