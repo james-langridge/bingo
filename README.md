@@ -1,26 +1,35 @@
 # Bingo
 
-A Progressive Web Application (PWA) for creating and playing custom bingo games. Built with React, TypeScript, and Vite, featuring offline functionality and zero-authentication gameplay.
+A real-time multiplayer Progressive Web Application (PWA) for creating and playing custom bingo games. Built with React, TypeScript, Vite, and Vercel serverless functions, featuring real-time synchronization, offline functionality, and zero-authentication gameplay.
 
 ## Architecture Overview
 
 ### Core Design Principles
 
 - **Zero Authentication**: No user accounts required. Games are created anonymously and shared via 6-character codes.
-- **Offline-First**: Full functionality offline using IndexedDB for local storage.
+- **Real-Time Multiplayer**: Support for multiple simultaneous players with live synchronization.
+- **Offline-First**: Full functionality offline with automatic sync when reconnected.
 - **Mobile-First**: Optimized for touch devices with responsive design.
 - **Functional Core**: Business logic implemented as pure functions with immutable data structures.
+- **Optimistic Updates**: Instant UI feedback with server reconciliation.
 
 ### Technology Stack
 
-- **Frontend Framework**: React 19 with TypeScript
+#### Frontend
+- **Framework**: React 19 with TypeScript
 - **Build Tool**: Vite 7
 - **State Management**: Zustand with Immer for immutable updates
 - **Offline Storage**: Dexie.js (IndexedDB wrapper)
 - **Styling**: Tailwind CSS with inline styles
 - **PWA**: Vite PWA plugin with Workbox
-- **UI Components**: Radix UI primitives for accessible components
 - **Routing**: React Router v7
+
+#### Backend
+- **Runtime**: Vercel Serverless Functions
+- **Database**: Redis (Upstash) for persistent storage
+- **API**: RESTful endpoints with smart polling
+- **Validation**: Runtime type checking with TypeScript
+- **Logging**: Pino for structured logging
 
 ## Project Structure
 
@@ -34,10 +43,15 @@ bingo/
 │   │   ├── HomePage.tsx       # Landing page with game creation
 │   │   ├── ShareModal.tsx     # QR code and sharing functionality
 │   │   ├── Celebration.tsx    # Win animation component
+│   │   ├── ConnectionStatus.tsx # Real-time connection indicator
+│   │   ├── WinnerNotification.tsx # Winner announcement display
+│   │   ├── NearMissNotification.tsx # Near-win notifications
+│   │   ├── ErrorBoundary.tsx  # Error handling wrapper
 │   │   └── LoadingSkeleton.tsx # Loading states
 │   ├── lib/             # Pure business logic
 │   │   ├── calculations.ts    # Game logic and utilities
 │   │   ├── storage.ts        # IndexedDB operations
+│   │   ├── syncManager.ts    # Real-time sync orchestration
 │   │   └── templates.ts      # Pre-made game templates
 │   ├── stores/          # State management
 │   │   └── gameStore.ts      # Zustand store
@@ -47,9 +61,19 @@ bingo/
 │   │   └── usePullToRefresh.ts # Pull-to-refresh functionality
 │   ├── App.tsx          # Root component with routing
 │   └── main.tsx         # Application entry point
+├── api/                 # Vercel serverless functions
+│   ├── game/
+│   │   ├── [code].ts         # Game CRUD operations
+│   │   └── [code]/
+│   │       └── claim-win.ts  # Atomic win validation
+│   ├── player/
+│   │   └── [code].ts         # Player state management
+│   └── game/changes/
+│       └── [code].ts         # Polling endpoint for updates
 ├── public/              # Static assets
 │   ├── bingo-icon.svg        # App icon
 │   └── icon-*.png            # PWA icons
+├── vercel.json          # Vercel deployment configuration
 └── vite.config.ts       # Build configuration
 ```
 
@@ -57,12 +81,16 @@ bingo/
 
 ### Game Model
 
-Games are stored as immutable data structures with the following properties:
+Games are stored with the following properties:
 
 - **gameCode**: 6-character alphanumeric code for sharing (e.g., "ABC123")
 - **adminToken**: 32-character secret token for administrative access
 - **items**: Array of bingo items with text and position
 - **settings**: Grid size (3x3, 4x4, or 5x5), win conditions, free space option
+- **players**: Map of active players with display names and join times
+- **squares**: Multi-person marking support with notes and photos (vacation mode)
+- **winner**: Player who successfully claimed victory
+- **lastModifiedAt**: Timestamp for change detection
 
 ### URL Structure
 
@@ -74,17 +102,23 @@ Games are stored as immutable data structures with the following properties:
 
 The application uses Zustand for state management with the following stores:
 
-- **gameStore**: Manages current game, player state, and local games list
-  - Actions: `createGame`, `loadGame`, `updateGameItems`, `markPosition`
-  - State: `currentGame`, `playerState`, `localGames`, `isLoading`
+- **gameStore**: Manages current game, player state, and synchronization
+  - Actions: `createGame`, `loadGame`, `updateGameItems`, `markPosition`, `claimWin`, `syncWithServer`
+  - State: `currentGame`, `playerState`, `localGames`, `isLoading`, `isSyncing`, `connectionStatus`
+  - Real-time sync: Automatic polling with adaptive intervals based on activity
 
-### Storage Layer
+### Storage Architecture
 
-IndexedDB is used for persistent local storage via Dexie.js:
+#### Local Storage (IndexedDB via Dexie.js)
+- **games**: Complete game objects indexed by gameCode
+- **playerStates**: Player progress and marked squares
+- **pendingEvents**: Offline action queue for sync
 
-- **games**: Stores complete game objects indexed by gameCode
-- **playerStates**: Stores player progress indexed by gameCode
-- **pendingEvents**: Queue for offline sync (future implementation)
+#### Server Storage (Redis via Upstash)
+- **Game state**: Authoritative game data with atomic operations
+- **Player registry**: Active players and their states
+- **Win validation**: Server-side verification of win claims
+- **Change tracking**: Timestamps for efficient polling
 
 ### Win Condition Logic
 
@@ -93,8 +127,10 @@ The game supports multiple win conditions:
 - **Line Win**: Complete any row, column, or diagonal
 - **Full Card**: Mark all squares on the board
 - **Free Space**: Optional center square that's automatically marked
+- **Near-Miss Detection**: Notifications when one square away from winning
+- **Atomic Win Claims**: Server-side validation prevents race conditions
 
-Win detection is implemented in `src/lib/calculations.ts:checkWinCondition`.
+Win detection is implemented in `src/lib/calculations.ts:checkWinCondition` with server validation in `api/game/[code]/claim-win.ts`.
 
 ## Development
 
@@ -120,9 +156,28 @@ npm run lint      # Run ESLint
 
 ### Environment Variables
 
-The application runs entirely client-side and requires no environment variables.
+For local development with full backend functionality:
+
+```bash
+# Redis connection (required for backend)
+KV_REST_API_URL=your_upstash_redis_url
+KV_REST_API_TOKEN=your_upstash_redis_token
+
+# Optional
+NODE_ENV=development
+```
+
+The frontend can run without these variables but will have limited functionality (no real-time sync or multiplayer).
 
 ## Key Features
+
+### Real-Time Multiplayer
+
+- **Live Synchronization**: Smart polling with adaptive intervals (100ms to 30s)
+- **Optimistic Updates**: Instant UI feedback with server reconciliation
+- **Conflict Resolution**: Automatic merging of concurrent player actions
+- **Connection Status**: Visual indicators for online/offline/syncing states
+- **Player Presence**: See who's playing in real-time
 
 ### Progressive Web App
 
@@ -130,13 +185,14 @@ The application runs entirely client-side and requires no environment variables.
 - **Offline Support**: Full functionality without network connection
 - **Service Worker**: Caches assets and enables offline mode
 - **App Manifest**: Defines app metadata and icons
+- **Background Sync**: Automatic synchronization when reconnected
 
 ### Game Templates
 
 Pre-configured templates available for common scenarios:
 
 - Holiday Dinner
-- Road Trip
+- Road Trip  
 - Family Reunion
 - Video Call
 - Birthday Party
@@ -159,16 +215,30 @@ Games can be shared via:
 - **Responsive Grid**: Adapts to different screen sizes
 - **Viewport Locking**: Prevents zoom and maintains portrait orientation
 
+### Advanced Features
+
+- **Vacation Mode**: Multi-person square marking with notes and photos
+- **Near-Miss Notifications**: Alerts when one square away from winning
+- **Winner Celebrations**: Confetti animation and winner announcement
+- **Atomic Win Claims**: Server-side validation prevents race conditions
+- **Error Boundaries**: Graceful error handling with game recovery
+
 ## Data Flow
 
 1. **Game Creation**:
-   - User enters title → Generate codes → Create game object → Save to IndexedDB → Navigate to admin view
+   - User enters title → Generate codes → Create game object → Save to IndexedDB → Upload to server → Navigate to admin view
 
 2. **Game Playing**:
-   - Load game from IndexedDB → Display board → Track marked positions → Check win conditions → Show celebration
+   - Join game → Fetch from server → Cache locally → Display board → Track marks → Sync with server
 
-3. **State Persistence**:
-   - All state changes → Update Zustand store → Persist to IndexedDB → Available offline
+3. **Real-Time Synchronization**:
+   - Local action → Optimistic update → Queue for sync → Poll server for changes → Merge states → Update UI
+
+4. **Win Flow**:
+   - Detect win condition → Claim win on server → Atomic validation → Broadcast to all players → Celebration
+
+5. **Offline Mode**:
+   - Actions queued locally → Store in IndexedDB → Auto-sync when online → Conflict resolution
 
 ## Code Organization
 
@@ -198,6 +268,17 @@ All IndexedDB operations are async and return promises:
 - `loadGameByCode()`: Retrieve game by code
 - `savePlayerState()`: Persist player progress
 - `loadPlayerState()`: Retrieve player progress
+- `queueOfflineAction()`: Queue actions for sync
+- `processOfflineQueue()`: Sync queued actions when online
+
+### Synchronization (`src/lib/syncManager.ts`)
+
+Manages real-time synchronization with smart polling:
+
+- `startPolling()`: Begin adaptive polling with exponential backoff
+- `stopPolling()`: Pause synchronization
+- `syncGameState()`: Fetch and merge server state
+- `mergeGameStates()`: Conflict-free merge of local and remote states
 
 ## Testing Approach
 
@@ -227,21 +308,49 @@ PWA features require HTTPS in production.
 
 ## Security Considerations
 
-- **Admin Tokens**: 32-character random strings, never exposed in UI
+- **Admin Tokens**: 32-character random strings, never exposed in UI or API responses
 - **Game Codes**: 6-character codes are public, no sensitive data
-- **Local Storage**: All data stored client-side, no server communication
-- **Input Validation**: Text inputs have max length constraints
+- **Input Validation**: Text inputs validated with length constraints
 - **XSS Protection**: React's default escaping prevents injection
+- **API Security**: Rate limiting and input validation on all endpoints
+- **Data Privacy**: No personal data collected, all games anonymous
+- **CORS**: Configured for production domain only
 
-## Future Considerations
+## Architecture Highlights
 
-The codebase is structured to support future enhancements:
+### Smart Polling System
 
-- **Server Sync**: Event sourcing system prepared for backend integration
-- **Real-time Updates**: WebSocket support via pending events queue
-- **User Accounts**: Optional authentication layer
-- **Game Analytics**: Event tracking infrastructure in place
-- **Multiplayer**: Shared state synchronization
+The application uses an innovative polling approach instead of WebSockets/SSE:
+
+- **Adaptive Intervals**: 100ms during activity, exponential backoff to 30s when idle
+- **Change Detection**: Uses timestamps to skip unnecessary updates
+- **Battery Efficient**: Reduces polling when app is in background
+- **Network Resilient**: Automatic retry with exponential backoff
+
+### Conflict Resolution
+
+Multi-player conflicts are resolved using:
+
+- **Last-Write-Wins**: For most game properties
+- **Union Merge**: For player marks (combines all marks)
+- **Atomic Operations**: For win claims (first valid claim wins)
+- **Optimistic UI**: Updates show immediately, reconcile with server
+
+## Deployment
+
+The application is deployed on Vercel:
+
+```bash
+# Deploy to production
+vercel --prod
+
+# Deploy to preview
+vercel
+```
+
+Required Vercel environment variables:
+- `KV_REST_API_URL`: Upstash Redis REST API URL
+- `KV_REST_API_TOKEN`: Upstash Redis REST API token
 
 ## Contributing
 
