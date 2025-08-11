@@ -42,6 +42,12 @@ interface GameStore {
   isConnected: boolean;
   optimisticState: PlayerState | null; // For optimistic updates
   lastServerState: Game | null; // For rollback
+  optimisticWinClaim: boolean; // Track if we're claiming a win optimistically
+  nearMissInfo: {
+    winnerName: string;
+    timeDifference: number;
+    showNotification: boolean;
+  } | null; // For near miss notifications
 
   // Actions (thin layer over calculations)
   createGame: (title: string) => Promise<Game>;
@@ -79,6 +85,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   isConnected: false,
   optimisticState: null,
   lastServerState: null,
+  optimisticWinClaim: false,
+  nearMissInfo: null,
 
   createGame: async (title) => {
     const game: Game = {
@@ -390,7 +398,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
   // Check if current player has won
   checkForWinner: async () => {
     const { currentGame, playerState } = get();
-    if (!currentGame || !playerState || playerState.hasWon) return;
+    if (!currentGame || !playerState) return;
+    
+    // If player already marked as won, skip check
+    if (playerState.hasWon) {
+      console.log("[Multiplayer] Player already marked as winner, skipping check");
+      return;
+    }
+    
+    // If game already has a winner and it's not us, don't check
+    if (currentGame.winner && currentGame.winner.displayName !== playerState.displayName) {
+      console.log("[Multiplayer] Game already has a different winner, skipping check");
+      return;
+    }
 
     const hasWon = checkWinCondition(
       playerState.markedPositions,
@@ -407,6 +427,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     if (hasWon) {
       console.log("[Multiplayer] Player has won! Announcing win...");
+      
+      // Check if we already won (e.g., after page refresh)
+      if (currentGame.winner?.displayName === playerState.displayName) {
+        console.log("[Multiplayer] We already won this game (possibly after refresh)");
+        // Just update local state
+        const updatedPlayerState: PlayerState = {
+          ...playerState,
+          hasWon: true,
+        };
+        await savePlayerState(updatedPlayerState);
+        set({ playerState: updatedPlayerState });
+        return;
+      }
+      
       // Update player state
       const updatedPlayerState: PlayerState = {
         ...playerState,
@@ -419,58 +453,146 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
   },
 
-  // Announce that current player has won
+  // Announce that current player has won with atomic check
   announceWin: async () => {
     const { currentGame, playerState, currentPlayerId } = get();
     if (!currentGame || !playerState || !currentPlayerId) return;
 
-    const winner: WinnerInfo = {
+    console.log("[Multiplayer] Attempting to announce win...");
+
+    // Step 1: Fetch absolute latest game state from server before declaring victory
+    let latestGame: Game | null = null;
+    if (navigator.onLine) {
+      try {
+        const response = await fetch(`/api/game/${currentGame.gameCode}`);
+        if (response.ok) {
+          latestGame = await response.json();
+          console.log("[Multiplayer] Fetched latest game state:", {
+            hasWinner: !!latestGame?.winner,
+            winnerName: latestGame?.winner?.displayName,
+          });
+        }
+      } catch (error) {
+        console.error("[Multiplayer] Failed to fetch latest game state:", error);
+      }
+    }
+
+    // Step 2: Check if someone already won
+    if (latestGame?.winner) {
+      console.log("[Multiplayer] Someone already won:", latestGame.winner.displayName);
+      
+      // Update local state with the actual winner
+      set({
+        currentGame: latestGame,
+        lastServerState: latestGame,
+      });
+
+      // Check if it was a near miss (within 5 seconds)
+      const timeDiff = Date.now() - latestGame.winner.wonAt;
+      if (timeDiff < 5000 && latestGame.winner.displayName !== playerState.displayName) {
+        // Trigger near miss notification
+        set(produce(draft => {
+          draft.nearMissInfo = {
+            winnerName: latestGame.winner!.displayName,
+            timeDifference: timeDiff,
+            showNotification: true,
+          };
+        }));
+      }
+      return; // Someone else already won
+    }
+
+    // Step 3: Prepare winner info with winning positions for verification
+    const winningPositions = playerState.markedPositions;
+    const winner: WinnerInfo & { winningPositions?: readonly number[] } = {
       playerId: currentPlayerId,
       displayName: playerState.displayName,
-      wonAt: Date.now(),
+      wonAt: Date.now(), // Will be replaced by server timestamp
       winType: currentGame.settings.requireFullCard ? "fullCard" : "line",
+      winningPositions, // For audit/verification
     };
 
-    console.log("[Multiplayer] Announcing win:", winner);
+    console.log("[Multiplayer] Attempting to claim victory:", winner);
 
-    // Update player's hasWon status in players list
-    const updatedPlayers = currentGame.players.map((p) =>
-      p.id === currentPlayerId
-        ? { ...p, hasWon: true, lastSeenAt: Date.now() }
-        : p,
-    );
-
-    const updatedGame: Game = {
+    // Step 4: Show optimistic UI immediately
+    const optimisticGame: Game = {
       ...currentGame,
-      players: updatedPlayers,
+      players: currentGame.players.map((p) =>
+        p.id === currentPlayerId
+          ? { ...p, hasWon: true, lastSeenAt: Date.now() }
+          : p,
+      ),
       winner,
       lastModifiedAt: Date.now(),
     };
 
-    // Save locally first
-    await saveGameLocal(updatedGame);
-    console.log("[Multiplayer] Game updated with winner, syncing to Redis...");
+    // Save optimistically locally
+    await saveGameLocal(optimisticGame);
+    set({
+      currentGame: optimisticGame,
+      playerState: { ...playerState, hasWon: true },
+      optimisticWinClaim: true, // Track that we're claiming a win
+    });
 
-    // Force immediate sync to server so other players see the winner
+    // Step 5: Try to claim victory on server with atomic check
     if (navigator.onLine) {
       try {
-        const response = await fetch(`/api/game/${currentGame.gameCode}`, {
+        const response = await fetch(`/api/game/${currentGame.gameCode}/claim-win`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(updatedGame),
+          body: JSON.stringify({
+            playerId: currentPlayerId,
+            displayName: playerState.displayName,
+            winType: winner.winType,
+            winningPositions: winner.winningPositions,
+            clientTimestamp: Date.now(),
+          }),
         });
-        if (response.ok) {
-          console.log("[Multiplayer] Winner announcement synced to server!");
+
+        const result = await response.json();
+
+        if (response.ok && result.accepted) {
+          console.log("[Multiplayer] Win claim accepted! You are the winner!");
+          // Update with server-confirmed winner info
+          const confirmedGame = result.game;
+          set({
+            currentGame: confirmedGame,
+            lastServerState: confirmedGame,
+            optimisticWinClaim: false,
+          });
+        } else if (result.actualWinner) {
+          console.log("[Multiplayer] Win claim rejected. Actual winner:", result.actualWinner.displayName);
+          
+          // Rollback optimistic update
+          const actualGame = result.game;
+          set({
+            currentGame: actualGame,
+            lastServerState: actualGame,
+            playerState: { ...playerState, hasWon: false }, // We didn't actually win
+            optimisticWinClaim: false,
+          });
+
+          // Check for near miss
+          const timeDiff = Math.abs(Date.now() - result.actualWinner.wonAt);
+          if (timeDiff < 5000) {
+            set(produce(draft => {
+              draft.nearMissInfo = {
+                winnerName: result.actualWinner.displayName,
+                timeDifference: timeDiff,
+                showNotification: true,
+              };
+            }));
+          }
         }
       } catch (error) {
-        console.error("[Multiplayer] Failed to sync winner announcement:", error);
+        console.error("[Multiplayer] Failed to claim victory:", error);
+        // Keep optimistic update but mark as unconfirmed
+        set({ optimisticWinClaim: false });
       }
+    } else {
+      // Offline - keep optimistic update, will verify when back online
+      console.log("[Multiplayer] Offline - win claim will be verified when connection restored");
     }
-
-    set({
-      currentGame: updatedGame,
-      playerState: { ...playerState, hasWon: true },
-    });
   },
 
   // Start polling for game updates (fallback for SSE)
@@ -581,8 +703,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   // Set connection status
   setConnectionStatus: (isConnected: boolean) => {
+    const previouslyConnected = get().isConnected;
     set({ isConnected });
     console.log(`[GameStore] Connection status: ${isConnected ? "Connected" : "Disconnected"}`);
+    
+    // When reconnecting, check if we have an unconfirmed win claim
+    if (!previouslyConnected && isConnected) {
+      const { optimisticWinClaim, playerState } = get();
+      if (optimisticWinClaim && playerState?.hasWon) {
+        console.log("[GameStore] Reconnected with unconfirmed win claim, verifying...");
+        // Re-attempt to claim the win
+        get().announceWin();
+      }
+    }
   },
 
   initialize: async () => {

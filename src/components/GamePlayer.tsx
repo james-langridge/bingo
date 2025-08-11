@@ -5,6 +5,7 @@ import { GameBoard } from "./GameBoard";
 import { Celebration } from "./Celebration";
 import { LoadingSkeleton } from "./LoadingSkeleton";
 import { ErrorBoundary } from "./ErrorBoundary";
+import { NearMissNotification } from "./NearMissNotification";
 import { usePullToRefresh } from "../hooks/usePullToRefresh";
 import { checkWinCondition, shuffleItems } from "../lib/calculations";
 
@@ -14,6 +15,7 @@ export function GamePlayer() {
   const {
     currentGame,
     playerState,
+    nearMissInfo,
     loadGame,
     joinGame,
     markPosition,
@@ -397,6 +399,18 @@ export function GamePlayer() {
       </div>
 
       {hasWon && <Celebration />}
+      
+      {/* Near miss notification */}
+      {nearMissInfo?.showNotification && (
+        <NearMissNotification
+          winnerName={nearMissInfo.winnerName}
+          timeDifference={nearMissInfo.timeDifference}
+          onClose={() => {
+            // Clear the near miss notification
+            useGameStore.setState({ nearMissInfo: null });
+          }}
+        />
+      )}
     </div>
   );
 }

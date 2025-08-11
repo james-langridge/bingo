@@ -50,6 +50,7 @@ export interface WinnerInfo {
   readonly displayName: string;
   readonly wonAt: number;
   readonly winType: "line" | "fullCard";
+  readonly winningPositions?: readonly number[]; // For audit/verification
 }
 
 // Event sourcing for sync
