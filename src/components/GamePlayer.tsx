@@ -67,7 +67,7 @@ export function GamePlayer() {
     if (currentGame?.winner) {
       console.log("[GamePlayer] Winner detected:", {
         winnerName: currentGame.winner.displayName,
-        isCurrentPlayer: currentGame.winner.displayName === playerState?.displayName,
+        isCurrentPlayer: currentGame.winner.playerId === currentPlayerId,
         wonAt: new Date(currentGame.winner.wonAt).toLocaleTimeString(),
       });
     }
@@ -348,7 +348,7 @@ export function GamePlayer() {
           {currentGame.winner && (
             <WinnerNotification
               winnerName={currentGame.winner.displayName}
-              isCurrentPlayer={currentGame.winner.displayName === playerState?.displayName}
+              isCurrentPlayer={currentGame.winner.playerId === currentPlayerId}
             />
           )}
 

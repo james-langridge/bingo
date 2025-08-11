@@ -583,7 +583,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       console.log("[Multiplayer] Someone already won:", latestGame.winner.displayName);
       
       // Check if WE are the winner (this can happen if we already won but are retrying)
-      if (latestGame.winner.displayName === playerState.displayName) {
+      if (latestGame.winner.playerId === currentPlayerId) {
         console.log("[Multiplayer] We are already the winner!");
         // Update local state to confirm we won
         set({
@@ -810,7 +810,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       console.log("[Multiplayer] New winner detected:", mergedGame.winner);
       
       // Check if WE are the winner
-      if (mergedGame.winner.displayName === playerState?.displayName) {
+      if (mergedGame.winner.playerId === currentPlayerId) {
         console.log("[Multiplayer] We are the winner! Clearing any near-miss notifications.");
         // Clear any near-miss notification since we're the winner
         set(produce(draft => {
@@ -875,8 +875,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     // If we detect a winner and it's us, update our player state
     if (mergedGame.winner && 
-        mergedGame.winner.displayName === playerState?.displayName && 
-        !playerState.hasWon) {
+        mergedGame.winner.playerId === currentPlayerId && 
+        playerState && !playerState.hasWon) {
       set(produce(draft => {
         if (draft.playerState) {
           draft.playerState.hasWon = true;
