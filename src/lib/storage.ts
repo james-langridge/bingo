@@ -61,19 +61,13 @@ async function fetchGameFromServer(gameCode: string): Promise<Game | null> {
       // Check if response is JSON
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.includes("application/json")) {
-        const data = await response.json();
+        const game = await response.json();
 
-        // Handle both direct game object and stringified JSON
-        let game: Game;
-        if (typeof data === "string") {
-          // Double-stringified, parse again
-          game = JSON.parse(data);
-        } else if (typeof data === "object" && data !== null) {
-          game = data;
-        } else {
+        // Validate we got a proper game object
+        if (!game || typeof game !== "object") {
           console.error(
-            `[Storage] Unexpected data type from server:`,
-            typeof data,
+            `[Storage] Invalid game data from server:`,
+            typeof game,
           );
           return null;
         }

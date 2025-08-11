@@ -82,12 +82,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(404).json({ error: "Game not found" });
       }
 
+      // Parse the JSON string from Redis before sending
+      const game = typeof gameData === 'string' ? JSON.parse(gameData) : gameData;
+      
       logger.info({ 
         msg: "Game fetched successfully", 
         gameCode: code,
+        hasWinner: !!game.winner,
+        playerCount: game.players?.length || 0,
         duration: Date.now() - startTime 
       });
-      return res.status(200).json(gameData);
+      return res.status(200).json(game);
     } catch (error) {
       logger.error({ 
         msg: "Failed to fetch game", 
@@ -108,7 +113,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         msg: "Saving game to Redis", 
         gameCode: code,
         gameId: game?.id,
-        itemCount: game?.items?.length 
+        itemCount: game?.items?.length,
+        hasWinner: !!game?.winner,
+        winnerName: game?.winner?.displayName,
+        playerCount: game?.players?.length
       });
 
       // Validate game object
