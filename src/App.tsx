@@ -4,6 +4,7 @@ import { HomePage } from "./components/HomePage";
 import { GamePlayer } from "./components/GamePlayer";
 import { GameEditor } from "./components/GameEditor";
 import { ConnectionStatus } from "./components/ConnectionStatus";
+import { ErrorBoundary, GameErrorBoundary } from "./components/ErrorBoundary";
 import { processPendingEvents } from "./lib/storage";
 
 function AppContent() {
@@ -13,9 +14,21 @@ function AppContent() {
   return (
     <>
       <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/game/:code" element={<GamePlayer />} />
-        <Route path="/game/:code/admin/:token" element={<GameEditor />} />
+        <Route path="/" element={
+          <ErrorBoundary context="HomePage">
+            <HomePage />
+          </ErrorBoundary>
+        } />
+        <Route path="/game/:code" element={
+          <GameErrorBoundary>
+            <GamePlayer />
+          </GameErrorBoundary>
+        } />
+        <Route path="/game/:code/admin/:token" element={
+          <GameErrorBoundary>
+            <GameEditor />
+          </GameErrorBoundary>
+        } />
       </Routes>
       {isInGame && <ConnectionStatus />}
     </>
@@ -45,9 +58,11 @@ function App() {
   }, []);
 
   return (
-    <Router>
-      <AppContent />
-    </Router>
+    <ErrorBoundary context="App">
+      <Router>
+        <AppContent />
+      </Router>
+    </ErrorBoundary>
   );
 }
 

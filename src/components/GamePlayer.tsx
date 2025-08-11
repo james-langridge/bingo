@@ -4,6 +4,7 @@ import { useGameStore } from "../stores/gameStore";
 import { GameBoard } from "./GameBoard";
 import { Celebration } from "./Celebration";
 import { LoadingSkeleton } from "./LoadingSkeleton";
+import { ErrorBoundary } from "./ErrorBoundary";
 import { usePullToRefresh } from "../hooks/usePullToRefresh";
 import { checkWinCondition, shuffleItems } from "../lib/calculations";
 
@@ -359,12 +360,29 @@ export function GamePlayer() {
             </div>
           </div>
 
-          <GameBoard
-            items={shuffledItems}
-            markedPositions={playerState?.markedPositions || []}
-            onItemClick={markPosition}
-            gridSize={currentGame.settings.gridSize}
-          />
+          <ErrorBoundary 
+            context="GameBoard"
+            fallback={(_error, reset) => (
+              <div className="bg-red-50 border-2 border-red-200 rounded-xl p-6 text-center">
+                <p className="text-red-600 font-medium mb-4">
+                  Unable to display the game board
+                </p>
+                <button
+                  onClick={reset}
+                  className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                >
+                  Try Again
+                </button>
+              </div>
+            )}
+          >
+            <GameBoard
+              items={shuffledItems}
+              markedPositions={playerState?.markedPositions || []}
+              onItemClick={markPosition}
+              gridSize={currentGame.settings.gridSize}
+            />
+          </ErrorBoundary>
 
           {currentGame.settings.requireFullCard ? (
             <p className="text-center text-sm text-gray-600 mt-4">
