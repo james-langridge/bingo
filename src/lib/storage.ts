@@ -18,9 +18,22 @@ class BingoDB extends Dexie {
 
 export const db = new BingoDB();
 
-// Backend sync functions
+// Sync throttling to prevent overwhelming the server
+const syncThrottle = new Map<string, number>();
+const SYNC_THROTTLE_MS = 1000; // Minimum 1 second between syncs per game
+
+// Backend sync functions with throttling and retry logic
 async function syncGameToServer(game: Game): Promise<boolean> {
   const startTime = performance.now();
+  
+  // Check throttle
+  const lastSync = syncThrottle.get(game.gameCode) || 0;
+  const timeSinceLastSync = Date.now() - lastSync;
+  if (timeSinceLastSync < SYNC_THROTTLE_MS) {
+    console.log(`[Storage] Throttling sync for game ${game.gameCode} (${timeSinceLastSync}ms since last sync)`);
+    return false;
+  }
+  
   try {
     console.log(`[Storage] Syncing game ${game.gameCode} to server...`);
     const response = await fetch(`/api/game/${game.gameCode}`, {
@@ -34,6 +47,7 @@ async function syncGameToServer(game: Game): Promise<boolean> {
       console.log(
         `[Storage] ✅ Game ${game.gameCode} synced successfully (${duration}ms)`,
       );
+      syncThrottle.set(game.gameCode, Date.now());
     } else {
       console.warn(
         `[Storage] ⚠️ Game ${game.gameCode} sync failed: ${response.status} ${response.statusText} (${duration}ms)`,
@@ -182,16 +196,43 @@ export async function loadGameByCode(
     // When online, always try to get the latest from server
     const serverGame = await fetchGameFromServer(gameCode);
     if (serverGame) {
-      // Server version is the source of truth
-      // Merge local changes if needed (preserve local admin token if it exists)
-      const mergedGame = localGame?.adminToken 
-        ? { ...serverGame, adminToken: localGame.adminToken }
-        : serverGame;
+      // Intelligent merge: preserve local admin token and merge player lists
+      let mergedGame = serverGame;
+      
+      if (localGame) {
+        // Preserve admin token if we have it locally
+        if (localGame.adminToken) {
+          mergedGame = { ...serverGame, adminToken: localGame.adminToken };
+        }
+        
+        // Merge player lists to avoid losing players
+        const playerMap = new Map<string, any>();
+        
+        // Add all server players first (source of truth)
+        serverGame.players?.forEach(player => {
+          playerMap.set(player.displayName, player);
+        });
+        
+        // Add any local players that might be missing (edge case)
+        localGame.players?.forEach(player => {
+          if (!playerMap.has(player.displayName)) {
+            // Player exists locally but not on server - might be a recent join
+            if (Date.now() - player.joinedAt < 30000) { // If joined in last 30 seconds
+              playerMap.set(player.displayName, player);
+            }
+          }
+        });
+        
+        mergedGame = {
+          ...mergedGame,
+          players: Array.from(playerMap.values()),
+        };
+      }
       
       // Cache the latest version locally
       await db.games.put(mergedGame);
       console.log(
-        `[Storage] ✅ Game ${gameCode} fetched from server (${serverGame.players?.length || 0} players)`,
+        `[Storage] ✅ Game ${gameCode} fetched from server (${mergedGame.players?.length || 0} players)`,
       );
       return mergedGame;
     } else if (localGame) {

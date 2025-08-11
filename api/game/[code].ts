@@ -131,19 +131,64 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: "Invalid game data" });
       }
 
+      // Get existing game for conflict resolution
+      const existingData = await redis.get(`game:${code}`);
+      let finalGame = game;
+      
+      if (existingData) {
+        const existing = typeof existingData === 'string' ? JSON.parse(existingData) : existingData;
+        
+        // Conflict resolution: merge player lists and preserve winner
+        if (existing.lastModifiedAt && game.lastModifiedAt) {
+          // Create a merged player list
+          const playerMap = new Map();
+          
+          // Add all existing players
+          existing.players?.forEach((player: any) => {
+            playerMap.set(player.displayName, player);
+          });
+          
+          // Merge in new players or update existing ones
+          game.players?.forEach((player: any) => {
+            const existingPlayer = playerMap.get(player.displayName);
+            if (!existingPlayer || player.lastSeenAt > existingPlayer.lastSeenAt) {
+              playerMap.set(player.displayName, player);
+            }
+          });
+          
+          finalGame = {
+            ...game,
+            players: Array.from(playerMap.values()),
+            // Preserve winner if it exists
+            winner: existing.winner || game.winner,
+            // Use the latest modification timestamp
+            lastModifiedAt: Math.max(existing.lastModifiedAt, game.lastModifiedAt),
+          };
+          
+          logger.info({
+            msg: "Merged game state",
+            gameCode: code,
+            existingPlayers: existing.players?.length,
+            newPlayers: game.players?.length,
+            mergedPlayers: finalGame.players?.length,
+          });
+        }
+      }
+
       // Store with 30-day TTL
-      await redis.set(`game:${code}`, JSON.stringify(game), {
+      await redis.set(`game:${code}`, JSON.stringify(finalGame), {
         ex: 30 * 24 * 60 * 60,
       });
 
       logger.info({ 
         msg: "Game saved successfully", 
         gameCode: code,
-        gameId: game.id,
+        gameId: finalGame.id,
+        playerCount: finalGame.players?.length,
         ttl: "30 days",
         duration: Date.now() - startTime 
       });
-      return res.status(200).json({ success: true });
+      return res.status(200).json({ success: true, game: finalGame });
     } catch (error) {
       logger.error({ 
         msg: "Failed to save game", 
