@@ -57,6 +57,7 @@ export const GameBoard = memo(
     gridSize: _gridSize, // Kept for API compatibility, but layout is now dynamic
     onItemClick,
     enableHaptic = true,
+    currentPlayerId,
   }: GameBoardProps) => {
     const handleClick = (position: number) => {
       // Add haptic feedback on mobile
@@ -104,6 +105,10 @@ export const GameBoard = memo(
         {items.map((item, index) => {
           const isMarkedByMe = markedPositions.includes(item.position);
           const markedBy = item.markedBy || [];
+          // Filter out the current player from markedBy list for display
+          const markedByOthers = currentPlayerId 
+            ? markedBy.filter(mark => mark.playerId !== currentPlayerId)
+            : markedBy;
           const isMarkedByAnyone = markedBy.length > 0;
           const textLength = item.text?.length || 0;
           const tileSize = tileSizes[index];
@@ -172,10 +177,10 @@ export const GameBoard = memo(
                 {item.text || "(empty)"}
               </span>
               
-              {/* Show who marked this square */}
-              {markedBy.length > 0 && (
+              {/* Show who marked this square (excluding current player) */}
+              {markedByOthers.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1 justify-center">
-                  {markedBy.slice(0, 3).map((mark, i) => (
+                  {markedByOthers.slice(0, 3).map((mark, i) => (
                     <span
                       key={i}
                       className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm text-xs font-bold"
@@ -184,9 +189,9 @@ export const GameBoard = memo(
                       {getInitials(mark.displayName)}
                     </span>
                   ))}
-                  {markedBy.length > 3 && (
+                  {markedByOthers.length > 3 && (
                     <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm text-xs font-bold">
-                      +{markedBy.length - 3}
+                      +{markedByOthers.length - 3}
                     </span>
                   )}
                 </div>
