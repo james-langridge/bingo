@@ -481,7 +481,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (latestGame?.winner) {
       console.log("[Multiplayer] Someone already won:", latestGame.winner.displayName);
       
-      // Update local state with the actual winner
+      // Check if WE are the winner (this can happen if we already won but are retrying)
+      if (latestGame.winner.displayName === playerState.displayName) {
+        console.log("[Multiplayer] We are already the winner!");
+        // Update local state to confirm we won
+        set({
+          currentGame: latestGame,
+          lastServerState: latestGame,
+          playerState: { ...playerState, hasWon: true },
+        });
+        return; // We already won, no need to claim again
+      }
+      
+      // Someone else won - update state and show near miss if applicable
       set({
         currentGame: latestGame,
         lastServerState: latestGame,
@@ -489,8 +501,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
       // Check if it was a near miss (within 5 seconds)
       const timeDiff = Date.now() - latestGame.winner.wonAt;
-      if (timeDiff < 5000 && latestGame.winner.displayName !== playerState.displayName) {
-        // Trigger near miss notification
+      if (timeDiff < 5000) {
+        // Trigger near miss notification for the player who didn't win
         set(produce(draft => {
           draft.nearMissInfo = {
             winnerName: latestGame.winner!.displayName,
@@ -651,9 +663,28 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // Check if there's a new winner
     if (mergedGame.winner && !currentGame.winner) {
       console.log("[Multiplayer] New winner detected:", mergedGame.winner);
-      // If someone else won, update our player state
+      // If someone else won, show near-miss notification if we were close
       if (mergedGame.winner.displayName !== playerState?.displayName) {
         console.log("[Multiplayer] Another player has won the game!");
+        
+        // Check if we had a winning board (near miss scenario)
+        if (playerState && checkWinCondition(
+          playerState.markedPositions,
+          currentGame.settings.gridSize,
+          currentGame.settings.requireFullCard,
+        )) {
+          // We had a winning board but someone else claimed it first
+          const timeDiff = Date.now() - mergedGame.winner.wonAt;
+          if (timeDiff < 5000) {
+            set(produce(draft => {
+              draft.nearMissInfo = {
+                winnerName: mergedGame.winner!.displayName,
+                timeDifference: timeDiff,
+                showNotification: true,
+              };
+            }));
+          }
+        }
       }
     }
 
