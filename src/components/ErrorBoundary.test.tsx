@@ -192,8 +192,11 @@ describe("ErrorBoundary", () => {
       );
 
       expect(consoleErrorSpy).toHaveBeenCalled();
-      expect(consoleGroupSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Error Boundary Caught Error")
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "Error:",
+        expect.objectContaining({
+          message: "Test error message"
+        })
       );
     });
 

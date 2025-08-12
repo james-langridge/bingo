@@ -16,13 +16,13 @@ import type { Game, PlayerState, GameEvent } from "../types/types";
 
 // Mock game data
 const mockGame: Game = {
-  id: "test-id-123",
-  adminToken: "test-admin-token-32chars1234567890ab",
-  gameCode: "ABC123",
+  id: "550e8400-e29b-41d4-a716-446655440000",
+  adminToken: "abcdef12345678901234567890123456",
+  gameCode: "ABC234",
   title: "Test Game",
   items: [
-    { id: "item-1", text: "Item 1", position: 0 },
-    { id: "item-2", text: "Item 2", position: 1 },
+    { id: "550e8400-e29b-41d4-a716-446655440001", text: "Item 1", position: 0 },
+    { id: "550e8400-e29b-41d4-a716-446655440002", text: "Item 2", position: 1 },
   ],
   settings: {
     gridSize: 5,
@@ -35,10 +35,11 @@ const mockGame: Game = {
 };
 
 const mockPlayerState: PlayerState = {
-  gameCode: "ABC123",
+  gameCode: "ABC234",
   displayName: "Player 1",
   markedPositions: [0, 5, 10],
   lastSyncAt: Date.now(),
+  hasWon: false,
 };
 
 describe("storage", () => {
@@ -103,7 +104,7 @@ describe("storage", () => {
     });
 
     test("handles multiple games", async () => {
-      const game2 = { ...mockGame, id: "game-456", gameCode: "DEF456" };
+      const game2 = { ...mockGame, id: "550e8400-e29b-41d4-a716-446655440003", gameCode: "DEF456" };
       await saveGameLocal(mockGame);
       await saveGameLocal(game2);
 
@@ -119,14 +120,14 @@ describe("storage", () => {
     });
 
     test("returns all saved games", async () => {
-      const game2 = { ...mockGame, id: "game-456", gameCode: "DEF456" };
+      const game2 = { ...mockGame, id: "550e8400-e29b-41d4-a716-446655440004", gameCode: "DEF456" };
       await saveGameLocal(mockGame);
       await saveGameLocal(game2);
 
       const games = await loadLocalGames();
       expect(games).toHaveLength(2);
-      expect(games.map((g) => g.id)).toContain("test-id-123");
-      expect(games.map((g) => g.id)).toContain("game-456");
+      expect(games.map((g) => g.id)).toContain("550e8400-e29b-41d4-a716-446655440000");
+      expect(games.map((g) => g.id)).toContain("550e8400-e29b-41d4-a716-446655440004");
     });
 
     test("returns games with all properties intact", async () => {
@@ -158,14 +159,14 @@ describe("storage", () => {
 
     test("returns game with matching code", async () => {
       await saveGameLocal(mockGame);
-      const game = await loadGameByCode("ABC123");
+      const game = await loadGameByCode("ABC234");
       expect(game).toEqual(mockGame);
     });
 
     test("returns correct game when multiple games exist", async () => {
       const game2 = {
         ...mockGame,
-        id: "game-456",
+        id: "550e8400-e29b-41d4-a716-446655440005",
         gameCode: "DEF456",
         title: "Game 2",
       };
@@ -193,7 +194,7 @@ describe("storage", () => {
         })
       );
       
-      const game = await loadGameByCode("abc123");
+      const game = await loadGameByCode("abc234");
       expect(game).toBeUndefined();
     });
   });
@@ -207,7 +208,7 @@ describe("storage", () => {
     test("returns game with matching admin token", async () => {
       await saveGameLocal(mockGame);
       const game = await loadGameByAdminToken(
-        "test-admin-token-32chars1234567890ab",
+        "abcdef12345678901234567890123456",
       );
       expect(game).toEqual(mockGame);
     });
@@ -215,7 +216,7 @@ describe("storage", () => {
     test("returns correct game when multiple games exist", async () => {
       const game2 = {
         ...mockGame,
-        id: "game-456",
+        id: "550e8400-e29b-41d4-a716-446655440006",
         adminToken: "different12345678901234567890123",
         title: "Game 2",
       };
@@ -232,22 +233,22 @@ describe("storage", () => {
   describe("deleteGameLocal", () => {
     test("deletes game by ID", async () => {
       await saveGameLocal(mockGame);
-      await deleteGameLocal("test-id-123");
+      await deleteGameLocal("550e8400-e29b-41d4-a716-446655440000");
 
       const games = await loadLocalGames();
       expect(games).toHaveLength(0);
     });
 
     test("only deletes specified game", async () => {
-      const game2 = { ...mockGame, id: "game-456", gameCode: "DEF456" };
+      const game2 = { ...mockGame, id: "550e8400-e29b-41d4-a716-446655440007", gameCode: "DEF456" };
       await saveGameLocal(mockGame);
       await saveGameLocal(game2);
 
-      await deleteGameLocal("test-id-123");
+      await deleteGameLocal("550e8400-e29b-41d4-a716-446655440000");
 
       const games = await loadLocalGames();
       expect(games).toHaveLength(1);
-      expect(games[0].id).toBe("game-456");
+      expect(games[0].id).toBe("550e8400-e29b-41d4-a716-446655440007");
     });
 
     test("handles deletion of non-existent game", async () => {
@@ -291,7 +292,7 @@ describe("storage", () => {
 
     test("returns player state for game code", async () => {
       await savePlayerState(mockPlayerState);
-      const state = await loadPlayerState("ABC123");
+      const state = await loadPlayerState("ABC234");
       expect(state).toEqual(mockPlayerState);
     });
 
@@ -468,7 +469,7 @@ describe("storage", () => {
       await savePlayerState(mockPlayerState);
 
       const games = await loadLocalGames();
-      const playerState = await loadPlayerState("ABC123");
+      const playerState = await loadPlayerState("ABC234");
 
       expect(games).toHaveLength(1);
       expect(playerState).toBeDefined();
@@ -477,7 +478,10 @@ describe("storage", () => {
     test("handles concurrent operations", async () => {
       const promises = [];
       for (let i = 0; i < 10; i++) {
-        const game = { ...mockGame, id: `game-${i}`, gameCode: `CODE${i}` };
+        // Generate valid 6-character game codes using only allowed characters: A-H, J-N, P-Z, 2-9
+        const validChars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        const gameCode = `TEST${validChars[i]}${validChars[i + 1]}`;
+        const game = { ...mockGame, id: `550e8400-e29b-41d4-a716-44665544000${i}`, gameCode };
         promises.push(saveGameLocal(game));
       }
 

@@ -11,8 +11,8 @@ export function safeValidate<T>(
     const validData = schema.parse(data);
     return { success: true, data: validData };
   } catch (error: any) {
-    if (error?.errors) {
-      const errorMessages = error.errors
+    if (error instanceof z.ZodError) {
+      const errorMessages = error.issues
         .map((e: any) => `${e.path?.join(".") || "root"}: ${e.message}`)
         .join(", ");
       return { success: false, error: errorMessages };
