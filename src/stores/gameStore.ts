@@ -1,23 +1,9 @@
 import { create } from "zustand";
 import { produce } from "immer";
-import type {
-  Game,
-  PlayerState,
-  BingoItem,
-  Player,
-  WinnerInfo,
-} from "../types/types.ts";
+import type { Game, PlayerState, BingoItem } from "../types/types.ts";
 import {
-  generateGameCode,
-  generateAdminToken,
-} from "../lib/calculations";
-import {
-  saveGameLocal,
-  loadLocalGames,
-  loadGameByCode,
-  deleteGameLocal,
-  savePlayerState,
   loadPlayerState,
+  saveGameLocal,
 } from "../lib/storage";
 import {
   getSyncManager,
@@ -25,6 +11,24 @@ import {
   mergeGameStates,
 } from "../lib/syncManager";
 import { TIMEOUTS } from "../lib/constants";
+
+import {
+  createGame,
+  loadGame,
+  saveGameItems,
+  deleteGame,
+  initializeGames,
+} from "./actions/gameActions";
+import {
+  joinGame as joinGameAction,
+  updatePlayerActivity as updateActivity,
+  persistPlayerState,
+} from "./actions/playerActions";
+import { checkForWinner, claimWin } from "./actions/winActions";
+import {
+  toggleItemMark,
+  updateMarkedPositions,
+} from "./calculations/itemCalculations";
 
 interface GameStore {
   currentGame: Game | null;
@@ -39,9 +43,9 @@ interface GameStore {
   pollingInterval: number | null;
   currentPlayerId: string | null;
   isConnected: boolean;
-  optimisticState: PlayerState | null; // For optimistic updates
-  lastServerState: Game | null; // For rollback
-  optimisticWinClaim: boolean; // Track if we're claiming a win optimistically
+  optimisticState: PlayerState | null;
+  lastServerState: Game | null;
+  optimisticWinClaim: boolean;
   nearMissInfo: {
     winnerName: string;
     timeDifference: number;
@@ -84,20 +88,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   nearMissInfo: null,
 
   createGame: async (title) => {
-    const game: Game = {
-      id: crypto.randomUUID(),
-      adminToken: generateAdminToken(),
-      gameCode: generateGameCode(),
-      title,
-      items: [],
-      settings: { gridSize: 5, requireFullCard: false, freeSpace: true },
-      createdAt: Date.now(),
-      lastModifiedAt: Date.now(),
-      players: [],
-    };
-
-    await saveGameLocal(game);
-
+    const game = await createGame(title);
     set(
       produce((draft) => {
         draft.currentGame = game;
@@ -107,9 +98,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
           adminToken: game.adminToken,
           title: game.title,
         });
-      }),
+      })
     );
-
     return game;
   },
 
@@ -117,7 +107,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({ isLoading: true });
 
     try {
-      const game = await loadGameByCode(gameCode);
+      const game = await loadGame(gameCode);
       const playerState = await loadPlayerState(gameCode);
 
       if (!game) {
@@ -133,7 +123,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       let playerId = null;
       if (playerState) {
         const existingPlayer = game.players.find(
-          p => p.displayName === playerState.displayName
+          (p) => p.displayName === playerState.displayName
         );
         if (existingPlayer) {
           playerId = existingPlayer.id;
@@ -152,7 +142,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
       const syncManager = getSyncManager({
         onGameUpdate: (updatedGame) => get().handleRealtimeUpdate(updatedGame),
-        onConnectionChange: (isConnected) => get().setConnectionStatus(isConnected),
+        onConnectionChange: (isConnected) =>
+          get().setConnectionStatus(isConnected),
         onWinnerAnnounced: () => {},
       });
       syncManager.connect(gameCode);
@@ -173,7 +164,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   loadGameAsAdmin: async (gameCode, adminToken) => {
     set({ isLoading: true });
 
-    const game = await loadGameByCode(gameCode);
+    const game = await loadGame(gameCode);
 
     if (game && game.adminToken === adminToken) {
       set({
@@ -193,19 +184,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { currentGame } = get();
     if (!currentGame) return;
 
-    const updatedGame: Game = {
-      ...currentGame,
-      items,
-      lastModifiedAt: Date.now(),
-    };
-
-    await saveGameLocal(updatedGame);
+    const updatedGame = await saveGameItems(currentGame, items);
 
     set(
       produce((draft: any) => {
         draft.currentGame = updatedGame;
         const gameIndex = draft.localGames.findIndex(
-          (g: any) => g.id === updatedGame.id,
+          (g: any) => g.id === updatedGame.id
         );
         if (gameIndex >= 0) {
           draft.localGames[gameIndex] = {
@@ -215,116 +200,47 @@ export const useGameStore = create<GameStore>((set, get) => ({
             title: updatedGame.title,
           };
         }
-      }),
+      })
     );
 
-    if (navigator.onLine && currentGame.adminToken) {
-      try {
-        const response = await fetch(`/api/game/${currentGame.gameCode}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(updatedGame),
-        });
-        
-        if (!response.ok) {
-        } else {
-          
-          const syncManager = getSyncManager();
-          if (syncManager) {
-            syncManager.markActivity(true);
-          }
-        }
-      } catch (error) {
-      }
+    const syncManager = getSyncManager();
+    if (syncManager) {
+      syncManager.markActivity(true);
     }
   },
 
   deleteGame: async (gameId) => {
-    await deleteGameLocal(gameId);
+    await deleteGame(gameId);
 
     set(
       produce((draft: any) => {
-        draft.localGames = draft.localGames.filter((g: any) => g.id !== gameId);
+        draft.localGames = draft.localGames.filter(
+          (g: any) => g.id !== gameId
+        );
         if (draft.currentGame?.id === gameId) {
           draft.currentGame = null;
         }
-      }),
+      })
     );
   },
 
   joinGame: async (gameCode, displayName) => {
-    const game = await loadGameByCode(gameCode);
-    if (!game) throw new Error("Game not found");
-
-    const playerId = crypto.randomUUID();
-    set({ currentPlayerId: playerId });
-
-    const existingPlayerIndex = game.players.findIndex(
-      (p) => p.displayName === displayName,
+    const { game, playerState, playerId } = await joinGameAction(
+      gameCode,
+      displayName
     );
 
-    let updatedPlayers = [...game.players];
-    if (existingPlayerIndex >= 0) {
-      updatedPlayers[existingPlayerIndex] = {
-        ...updatedPlayers[existingPlayerIndex],
-        id: playerId,
-        lastSeenAt: Date.now(),
-        isOnline: true,
-      };
-    } else {
-      const newPlayer: Player = {
-        id: playerId,
-        displayName,
-        joinedAt: Date.now(),
-        lastSeenAt: Date.now(),
-        hasWon: false,
-        isOnline: true,
-      };
-      updatedPlayers.push(newPlayer);
-    }
-
-    const updatedGame: Game = {
-      ...game,
-      players: updatedPlayers,
-      lastModifiedAt: Date.now(),
-    };
-
-    await saveGameLocal(updatedGame);
-
-    if (navigator.onLine) {
-      try {
-        const response = await fetch(`/api/game/${gameCode}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(updatedGame),
-        });
-        if (response.ok) {
-        }
-      } catch (error) {
-      }
-    }
-
-    let playerState = await loadPlayerState(gameCode);
-    if (!playerState || playerState.displayName !== displayName) {
-      playerState = {
-        gameCode,
-        displayName,
-        markedPositions: [],
-        lastSyncAt: Date.now(),
-        hasWon: existingPlayerIndex >= 0 ? updatedPlayers[existingPlayerIndex].hasWon : false,
-      };
-      await savePlayerState(playerState);
-    }
-
     set({
-      currentGame: updatedGame,
+      currentGame: game,
       playerState,
-      lastServerState: updatedGame,
+      currentPlayerId: playerId,
+      lastServerState: game,
     });
 
     const syncManager = getSyncManager({
       onGameUpdate: (updatedGame) => get().handleRealtimeUpdate(updatedGame),
-      onConnectionChange: (isConnected) => get().setConnectionStatus(isConnected),
+      onConnectionChange: (isConnected) =>
+        get().setConnectionStatus(isConnected),
       onWinnerAnnounced: () => {},
     });
     syncManager.connect(gameCode);
@@ -353,52 +269,34 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
         const marked = draft.playerState.markedPositions;
         const isUnmarking = marked.includes(position);
-        
-        if (isUnmarking) {
-          draft.playerState.markedPositions = marked.filter(
-            (pos: number) => pos !== position,
-          );
-        } else {
-          draft.playerState.markedPositions = [...marked, position];
-        }
 
+        draft.playerState.markedPositions = updateMarkedPositions(
+          marked,
+          position,
+          isUnmarking
+        );
         draft.playerState.lastSyncAt = Date.now();
 
         const itemIndex = draft.currentGame.items.findIndex(
           (item: any) => item.position === position
         );
-        
+
         if (itemIndex >= 0) {
           const item = draft.currentGame.items[itemIndex];
-          const markedBy = item.markedBy || [];
-          const existingMarkIndex = markedBy.findIndex(
-            (mark: any) => mark.playerId === currentPlayerId
+          draft.currentGame.items[itemIndex] = toggleItemMark(
+            item,
+            currentPlayerId,
+            playerState.displayName,
+            isUnmarking
           );
-
-          if (isUnmarking && existingMarkIndex >= 0) {
-            draft.currentGame.items[itemIndex] = {
-              ...item,
-              markedBy: markedBy.filter((_: any, i: number) => i !== existingMarkIndex),
-            };
-          } else if (!isUnmarking && existingMarkIndex < 0) {
-            const newMark = {
-              playerId: currentPlayerId,
-              displayName: playerState.displayName,
-              markedAt: Date.now(),
-            };
-            draft.currentGame.items[itemIndex] = {
-              ...item,
-              markedBy: [...markedBy, newMark],
-            };
-          }
         }
-      }),
+      })
     );
 
     const updatedState = get();
     if (updatedState.playerState && updatedState.currentGame) {
       Promise.all([
-        savePlayerState(updatedState.playerState),
+        persistPlayerState(updatedState.playerState),
         saveGameLocal(updatedState.currentGame),
       ]).catch(() => {
         set(
@@ -407,7 +305,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
               draft.playerState = draft.optimisticState;
               draft.optimisticState = null;
             }
-          }),
+          })
         );
       });
 
@@ -421,246 +319,85 @@ export const useGameStore = create<GameStore>((set, get) => ({
         if (!draft.playerState) return;
         draft.playerState.markedPositions = [];
         draft.playerState.lastSyncAt = Date.now();
-      }),
+      })
     );
 
     const { playerState } = get();
     if (playerState) {
-      savePlayerState(playerState);
+      persistPlayerState(playerState);
     }
   },
 
   updatePlayerActivity: async () => {
-    const { currentGame, playerState, currentPlayerId } = get();
-    if (!currentGame || !playerState || !currentPlayerId) return;
+    const { currentGame, currentPlayerId } = get();
+    if (!currentGame || !currentPlayerId) return;
 
-    const syncManager = getSyncManager();
-    if (syncManager) {
-      syncManager.markActivity(false);
-    }
-
-    const playerExists = currentGame.players.some(p => p.id === currentPlayerId);
-    if (!playerExists) {
-      return;
-    }
-
-    const updatedPlayers = currentGame.players.map((p) =>
-      p.id === currentPlayerId
-        ? { ...p, lastSeenAt: Date.now(), isOnline: true }
-        : p,
-    );
-
-    const updatedGame: Game = {
-      ...currentGame,
-      players: updatedPlayers,
-      lastModifiedAt: Date.now(),
-    };
-
-    await saveGameLocal(updatedGame);
+    await updateActivity(currentGame, currentPlayerId);
   },
 
   checkForWinner: async () => {
     const { currentGame, playerState } = get();
     if (!currentGame || !playerState) return;
-    
-    if (playerState.hasWon) {
-      return;
-    }
-    
-    if (currentGame.winner && currentGame.winner.displayName !== playerState.displayName) {
-      return;
-    }
 
-    const totalItems = currentGame.items.length;
-    const hasWon = playerState.markedPositions.length === totalItems;
-
-
-    if (hasWon) {
-      
-      if (currentGame.winner?.displayName === playerState.displayName) {
-        const updatedPlayerState: PlayerState = {
-          ...playerState,
-          hasWon: true,
-        };
-        await savePlayerState(updatedPlayerState);
-        set({ playerState: updatedPlayerState });
-        return;
-      }
-      
+    const hasWon = await checkForWinner(currentGame, playerState);
+    if (hasWon && !playerState.hasWon) {
       const updatedPlayerState: PlayerState = {
         ...playerState,
         hasWon: true,
       };
-      await savePlayerState(updatedPlayerState);
-
+      await persistPlayerState(updatedPlayerState);
       await get().announceWin();
     }
   },
 
-  // Announce that current player has won with atomic check
   announceWin: async () => {
     const { currentGame, playerState, currentPlayerId } = get();
     if (!currentGame || !playerState || !currentPlayerId) return;
 
+    set({ optimisticWinClaim: true });
 
-    // Trigger immediate poll after win announcement
-    const syncManager = getSyncManager();
-    if (syncManager) {
-      syncManager.markActivity(true);
-    }
+    const result = await claimWin(currentGame, playerState, currentPlayerId);
 
-    // Step 1: Fetch absolute latest game state from server before declaring victory
-    let latestGame: Game | null = null;
-    if (navigator.onLine) {
-      try {
-        const response = await fetch(`/api/game/${currentGame.gameCode}`);
-        if (response.ok) {
-          latestGame = await response.json();
-        }
-      } catch (error) {
-      }
-    }
-
-    // Step 2: Check if someone already won
-    if (latestGame?.winner) {
-      
-      // Check if WE are the winner (this can happen if we already won but are retrying)
-      if (latestGame.winner.playerId === currentPlayerId) {
-        // Update local state to confirm we won
-        set({
-          currentGame: latestGame,
-          lastServerState: latestGame,
-          playerState: { ...playerState, hasWon: true },
-          nearMissInfo: null, // Clear any near-miss notification since we're the winner
-        });
-        return; // We already won, no need to claim again
-      }
-      
-      // Someone else won - update state and show near miss if applicable
+    if (result.accepted) {
       set({
-        currentGame: latestGame,
-        lastServerState: latestGame,
+        currentGame: result.game,
+        lastServerState: result.game,
+        playerState: { ...playerState, hasWon: true },
+        optimisticWinClaim: false,
+        nearMissInfo: null,
+      });
+    } else {
+      set({
+        currentGame: result.game,
+        lastServerState: result.game,
+        playerState: { ...playerState, hasWon: false },
+        optimisticWinClaim: false,
       });
 
-      // Check if it was a near miss
-      const timeDiff = Date.now() - latestGame.winner.wonAt;
-      if (timeDiff < TIMEOUTS.NEAR_MISS_WINDOW) {
-        // Trigger near miss notification for the player who didn't win
-        set(produce(draft => {
-          draft.nearMissInfo = {
-            winnerName: latestGame.winner!.displayName,
-            timeDifference: timeDiff,
-            showNotification: true,
-          };
-        }));
+      if (result.nearMiss) {
+        set(
+          produce((draft) => {
+            draft.nearMissInfo = {
+              ...result.nearMiss,
+              showNotification: true,
+            };
+          })
+        );
       }
-      return; // Someone else already won
-    }
-
-    // Step 3: Prepare winner info with winning positions for verification
-    const winningPositions = playerState.markedPositions;
-    const winner: WinnerInfo & { winningPositions?: readonly number[] } = {
-      playerId: currentPlayerId,
-      displayName: playerState.displayName,
-      wonAt: Date.now(), // Will be replaced by server timestamp
-      winType: currentGame.settings.requireFullCard ? "fullCard" : "line",
-      winningPositions, // For audit/verification
-    };
-
-
-    // Step 4: Show optimistic UI immediately
-    const optimisticGame: Game = {
-      ...currentGame,
-      players: currentGame.players.map((p) =>
-        p.id === currentPlayerId
-          ? { ...p, hasWon: true, lastSeenAt: Date.now() }
-          : p,
-      ),
-      winner,
-      lastModifiedAt: Date.now(),
-    };
-
-    // Save optimistically locally
-    await saveGameLocal(optimisticGame);
-    set({
-      currentGame: optimisticGame,
-      playerState: { ...playerState, hasWon: true },
-      optimisticWinClaim: true, // Track that we're claiming a win
-    });
-
-    // Step 5: Try to claim victory on server with atomic check
-    if (navigator.onLine) {
-      try {
-        const response = await fetch(`/api/game/${currentGame.gameCode}/claim-win`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            playerId: currentPlayerId,
-            displayName: playerState.displayName,
-            winType: winner.winType,
-            winningPositions: winner.winningPositions,
-            clientTimestamp: Date.now(),
-          }),
-        });
-
-        const result = await response.json();
-
-        if (response.ok && result.accepted) {
-          // Update with server-confirmed winner info
-          const confirmedGame = result.game;
-          set({
-            currentGame: confirmedGame,
-            lastServerState: confirmedGame,
-            optimisticWinClaim: false,
-            nearMissInfo: null, // Clear any near-miss notification since we won
-          });
-        } else if (result.actualWinner) {
-          
-          // Rollback optimistic update
-          const actualGame = result.game;
-          set({
-            currentGame: actualGame,
-            lastServerState: actualGame,
-            playerState: { ...playerState, hasWon: false }, // We didn't actually win
-            optimisticWinClaim: false,
-          });
-
-          // Check for near miss
-          const timeDiff = Math.abs(Date.now() - result.actualWinner.wonAt);
-          if (timeDiff < TIMEOUTS.NEAR_MISS_WINDOW) {
-            set(produce(draft => {
-              draft.nearMissInfo = {
-                winnerName: result.actualWinner.displayName,
-                timeDifference: timeDiff,
-                showNotification: true,
-              };
-            }));
-          }
-        }
-      } catch (error) {
-        // Keep optimistic update but mark as unconfirmed
-        set({ optimisticWinClaim: false });
-      }
-    } else {
-      // Offline - keep optimistic update, will verify when back online
     }
   },
 
-  // Start polling for game updates
   startPolling: () => {
-    // Polling is now handled by SyncManager with smart intervals
     const syncManager = getSyncManager();
     if (syncManager) {
       syncManager.pollNow();
     }
 
-    // Still maintain activity updates for vacation mode
     const { pollingInterval } = get();
-    if (pollingInterval) return; // Already have activity timer
+    if (pollingInterval) return;
 
-    // Update player activity periodically (for vacation mode presence)
     const interval = window.setInterval(() => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === "visible") {
         get().updatePlayerActivity();
       }
     }, TIMEOUTS.ACTIVITY_CHECK);
@@ -668,81 +405,60 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({ pollingInterval: interval });
   },
 
-  // Stop polling and disconnect
   stopPolling: () => {
     const { pollingInterval } = get();
     if (pollingInterval) {
       clearInterval(pollingInterval);
       set({ pollingInterval: null });
     }
-    
-    // Disconnect SyncManager (which stops polling)
+
     resetSyncManager();
   },
 
-  // Refresh game state to get latest updates from Redis
   refreshGameState: async () => {
     const { currentGame } = get();
     if (!currentGame) return;
 
     try {
-      // Fetch latest game state from server/Redis
-      const latestGame = await loadGameByCode(currentGame.gameCode);
+      const latestGame = await loadGame(currentGame.gameCode);
 
-      // Only update if we actually got a game back
       if (latestGame) {
         get().handleRealtimeUpdate(latestGame);
-      } else {
-        // Game might have been deleted or is temporarily unavailable
-        // Don't throw an error - just skip the update
       }
-    } catch (error) {
-      // Don't throw - just log the error to avoid triggering ErrorBoundary
-    }
+    } catch (error) {}
   },
 
-  // Handle real-time updates from SSE or polling
   handleRealtimeUpdate: (latestGame: Game) => {
     const { currentGame, currentPlayerId, playerState } = get();
     if (!currentGame) return;
 
-    // Ensure we have a complete game object for merging
-    // If latestGame is a partial update, merge it with currentGame first
     let gameToMerge: Game;
-    
+
     if (latestGame.settings) {
-      // Full update - use as is
       gameToMerge = latestGame;
     } else {
-      // Partial update - need to carefully merge items
-      // If latestGame has items, merge them properly instead of replacing
       if (latestGame.items) {
-        // Use the longer array to ensure we don't lose items
         const maxLength = Math.max(
           latestGame.items.length,
           currentGame.items?.length || 0
         );
-        
+
         const mergedItems = [];
         for (let i = 0; i < maxLength; i++) {
           const currentItem = currentGame.items?.[i];
           const updatedItem = latestGame.items[i];
-          
+
           if (updatedItem) {
-            // If we have an update, merge it with current (if exists)
             if (currentItem) {
               mergedItems.push({
                 ...currentItem,
                 ...updatedItem,
-                // Ensure text is always preserved
                 text: updatedItem.text || currentItem.text,
               });
             } else {
-              // New item from server
               mergedItems.push(updatedItem);
             }
           } else if (currentItem) {
-            // Keep current item if no update
             mergedItems.push(currentItem);
           }
         }
@@ -752,46 +468,42 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
     }
 
-    // Use proper state merging to prevent overwrites
     const mergedGame = mergeGameStates(currentGame, gameToMerge);
 
-    // Check if there's a new winner
     if (mergedGame.winner && !currentGame.winner) {
-      
-      // Check if WE are the winner
       if (mergedGame.winner.playerId === currentPlayerId) {
-        // Clear any near-miss notification since we're the winner
-        set(produce(draft => {
-          draft.nearMissInfo = null;
-        }));
+        set(
+          produce((draft) => {
+            draft.nearMissInfo = null;
+          })
+        );
       } else {
-        // Someone else won, show near-miss notification if we were close
-        
-        // Check if we had a winning board (near miss scenario)
-        if (playerState && currentGame.items && 
-            playerState.markedPositions.length === currentGame.items.length) {
-          // We had a winning board but someone else claimed it first
+        if (
+          playerState &&
+          currentGame.items &&
+          playerState.markedPositions.length === currentGame.items.length
+        ) {
           const timeDiff = Date.now() - mergedGame.winner.wonAt;
           if (timeDiff < TIMEOUTS.NEAR_MISS_WINDOW) {
-            set(produce(draft => {
-              draft.nearMissInfo = {
-                winnerName: mergedGame.winner!.displayName,
-                timeDifference: timeDiff,
-                showNotification: true,
-              };
-            }));
+            set(
+              produce((draft) => {
+                draft.nearMissInfo = {
+                  winnerName: mergedGame.winner!.displayName,
+                  timeDifference: timeDiff,
+                  showNotification: true,
+                };
+              })
+            );
           }
         }
       }
     }
 
-    // Check if new players joined
     const currentPlayerCount = currentGame.players?.length || 0;
     const latestPlayerCount = mergedGame.players?.length || 0;
     if (latestPlayerCount > currentPlayerCount) {
     }
 
-    // Mark currently active players
     const now = Date.now();
 
     const updatedPlayers = mergedGame.players.map((p) => ({
@@ -802,41 +514,40 @@ export const useGameStore = create<GameStore>((set, get) => ({
           : now - (p.lastSeenAt || 0) < TIMEOUTS.ONLINE_THRESHOLD,
     }));
 
-    // Create updated game with preserved admin token if it exists
     const updatedGame: Game = {
       ...mergedGame,
       players: updatedPlayers,
       ...(currentGame.adminToken ? { adminToken: currentGame.adminToken } : {}),
     };
 
-    // Update the entire game state including winner and players list
-    set({ 
+    set({
       currentGame: updatedGame,
       lastServerState: updatedGame,
     });
 
-    // If we detect a winner and it's us, update our player state
-    if (mergedGame.winner && 
-        mergedGame.winner.playerId === currentPlayerId && 
-        playerState && !playerState.hasWon) {
-      set(produce(draft => {
-        if (draft.playerState) {
-          draft.playerState.hasWon = true;
-        }
-      }));
+    if (
+      mergedGame.winner &&
+      mergedGame.winner.playerId === currentPlayerId &&
+      playerState &&
+      !playerState.hasWon
+    ) {
+      set(
+        produce((draft) => {
+          if (draft.playerState) {
+            draft.playerState.hasWon = true;
+          }
+        })
+      );
     }
   },
 
-  // Set connection status
   setConnectionStatus: (isConnected: boolean) => {
     const previouslyConnected = get().isConnected;
     set({ isConnected });
-    
-    // When reconnecting, check if we have an unconfirmed win claim
+
     if (!previouslyConnected && isConnected) {
       const { optimisticWinClaim, playerState } = get();
       if (optimisticWinClaim && playerState?.hasWon) {
-        // Re-attempt to claim the win
         get().announceWin();
       }
     }
@@ -845,7 +556,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   initialize: async () => {
     set({ isLoading: true });
 
-    const games = await loadLocalGames();
+    const games = await initializeGames();
     const localGames = games.map((game) => ({
       id: game.id,
       gameCode: game.gameCode,
