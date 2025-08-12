@@ -24,6 +24,7 @@ import {
   resetSyncManager,
   mergeGameStates,
 } from "../lib/syncManager";
+import { TIMEOUTS } from "../lib/constants";
 
 interface GameStore {
   // Immutable state
@@ -599,9 +600,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
         lastServerState: latestGame,
       });
 
-      // Check if it was a near miss (within 5 seconds)
+      // Check if it was a near miss
       const timeDiff = Date.now() - latestGame.winner.wonAt;
-      if (timeDiff < 5000) {
+      if (timeDiff < TIMEOUTS.NEAR_MISS_WINDOW) {
         // Trigger near miss notification for the player who didn't win
         set(produce(draft => {
           draft.nearMissInfo = {
@@ -684,7 +685,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
           // Check for near miss
           const timeDiff = Math.abs(Date.now() - result.actualWinner.wonAt);
-          if (timeDiff < 5000) {
+          if (timeDiff < TIMEOUTS.NEAR_MISS_WINDOW) {
             set(produce(draft => {
               draft.nearMissInfo = {
                 winnerName: result.actualWinner.displayName,
@@ -720,7 +721,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       if (document.visibilityState === 'visible') {
         get().updatePlayerActivity();
       }
-    }, 60000); // 60 seconds for vacation mode
+    }, TIMEOUTS.ACTIVITY_CHECK);
 
     set({ pollingInterval: interval });
   },
@@ -829,7 +830,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
             playerState.markedPositions.length === currentGame.items.length) {
           // We had a winning board but someone else claimed it first
           const timeDiff = Date.now() - mergedGame.winner.wonAt;
-          if (timeDiff < 5000) {
+          if (timeDiff < TIMEOUTS.NEAR_MISS_WINDOW) {
             set(produce(draft => {
               draft.nearMissInfo = {
                 winnerName: mergedGame.winner!.displayName,
@@ -850,14 +851,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     // Mark currently active players
     const now = Date.now();
-    const onlineThreshold = 15000; // Consider "online" if seen in last 15 seconds
 
     const updatedPlayers = mergedGame.players.map((p) => ({
       ...p,
       isOnline:
         p.id === currentPlayerId
           ? true
-          : now - (p.lastSeenAt || 0) < onlineThreshold,
+          : now - (p.lastSeenAt || 0) < TIMEOUTS.ONLINE_THRESHOLD,
     }));
 
     // Create updated game with preserved admin token if it exists

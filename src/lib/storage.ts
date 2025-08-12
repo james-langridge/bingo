@@ -1,5 +1,6 @@
 import Dexie, { type Table } from "dexie";
 import type { Game, PlayerState, GameEvent } from "../types/types.ts";
+import { STORAGE, TIMEOUTS } from "./constants";
 
 class BingoDB extends Dexie {
   games!: Table<Game>;
@@ -20,7 +21,6 @@ export const db = new BingoDB();
 
 // Sync throttling to prevent overwhelming the server
 const syncThrottle = new Map<string, number>();
-const SYNC_THROTTLE_MS = 1000; // Minimum 1 second between syncs per game
 
 // Backend sync functions with throttling and retry logic
 async function syncGameToServer(game: Game): Promise<boolean> {
@@ -28,7 +28,7 @@ async function syncGameToServer(game: Game): Promise<boolean> {
   // Check throttle
   const lastSync = syncThrottle.get(game.gameCode) || 0;
   const timeSinceLastSync = Date.now() - lastSync;
-  if (timeSinceLastSync < SYNC_THROTTLE_MS) {
+  if (timeSinceLastSync < STORAGE.SYNC_THROTTLE_MS) {
     return false;
   }
   
@@ -148,7 +148,7 @@ export async function loadGameByCode(
         localGame.players?.forEach(player => {
           if (!playerMap.has(player.displayName)) {
             // Player exists locally but not on server - might be a recent join
-            if (Date.now() - player.joinedAt < 30000) { // If joined in last 30 seconds
+            if (Date.now() - player.joinedAt < TIMEOUTS.PLAYER_JOIN_RECENT) {
               playerMap.set(player.displayName, player);
             }
           }

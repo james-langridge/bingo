@@ -1,5 +1,6 @@
 import { memo, useMemo } from "react";
 import type { BingoItem } from "../types/types";
+import { UI_CONFIG } from "../lib/constants";
 
 interface GameBoardProps {
   items: readonly BingoItem[];
@@ -62,7 +63,7 @@ export const GameBoard = memo(
     const handleClick = (position: number) => {
       // Add haptic feedback on mobile
       if (enableHaptic && "vibrate" in navigator) {
-        navigator.vibrate(10);
+        navigator.vibrate(UI_CONFIG.HAPTIC_DURATION);
       }
       onItemClick(position);
     };

@@ -1,6 +1,7 @@
 import { Component } from "react";
 import type { ReactNode, ErrorInfo } from "react";
 import { useGameStore } from "../stores/gameStore";
+import { STORAGE, TIMEOUTS } from "../lib/constants";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -39,8 +40,8 @@ function logError(error: Error, errorInfo: ErrorInfo | null, context?: string) {
   try {
     const errorHistory = JSON.parse(localStorage.getItem('errorHistory') || '[]');
     errorHistory.push(errorData);
-    // Keep only last 10 errors
-    if (errorHistory.length > 10) {
+    // Keep only last N errors
+    if (errorHistory.length > STORAGE.ERROR_HISTORY_LIMIT) {
       errorHistory.shift();
     }
     localStorage.setItem('errorHistory', JSON.stringify(errorHistory));
@@ -165,8 +166,8 @@ function ErrorFallback({ error, errorInfo, reset, context }: ErrorFallbackProps)
       const preserved = sessionStorage.getItem('preservedGameState');
       if (preserved) {
         const state = JSON.parse(preserved);
-        // Check if state is recent (within 5 minutes)
-        if (Date.now() - state.timestamp < 5 * 60 * 1000) {
+        // Check if state is recent
+        if (Date.now() - state.timestamp < TIMEOUTS.RECOVERY_WINDOW) {
           // Store for recovery after reset
           localStorage.setItem('recoveryState', preserved);
         }

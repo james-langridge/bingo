@@ -1,4 +1,5 @@
 import type { Game, PlayerState } from "../types/types";
+import { POLLING } from "./constants";
 
 /**
  * SyncManager handles real-time synchronization of game state
@@ -30,18 +31,12 @@ class SyncManager {
   private gameCode: string | null = null;
   private isConnected: boolean = false;
   private pollingState: PollingState = {
-    interval: 2000, // Start with 2 seconds
+    interval: POLLING.ACTIVE,
     lastActivityTime: Date.now(),
     lastSyncTime: 0,
     lastVersion: "",
     consecutiveErrors: 0,
   };
-  
-  // Polling interval configuration
-  private readonly ACTIVE_INTERVAL = 2000;    // 2 seconds during active play
-  private readonly IDLE_INTERVAL = 10000;     // 10 seconds after 1 minute idle
-  private readonly INACTIVE_INTERVAL = 30000; // 30 seconds after 5 minutes idle
-  private readonly IMMEDIATE_POLL_DELAY = 100; // Near-instant poll after user action
   
   private visibilityHandler: (() => void) | null = null;
   private isDocumentVisible: boolean = true;
@@ -92,21 +87,21 @@ class SyncManager {
     
     // If document is hidden, use a longer interval
     if (!this.isDocumentVisible) {
-      return this.INACTIVE_INTERVAL;
+      return POLLING.INACTIVE;
     }
     
     // Active play: < 1 minute since last activity
-    if (timeSinceActivity < 60000) {
-      return this.ACTIVE_INTERVAL;
+    if (timeSinceActivity < POLLING.IDLE_THRESHOLD) {
+      return POLLING.ACTIVE;
     }
     
     // Idle: 1-5 minutes since last activity
-    if (timeSinceActivity < 300000) {
-      return this.IDLE_INTERVAL;
+    if (timeSinceActivity < POLLING.INACTIVE_THRESHOLD) {
+      return POLLING.IDLE;
     }
     
     // Inactive: > 5 minutes since last activity
-    return this.INACTIVE_INTERVAL;
+    return POLLING.INACTIVE;
   }
 
   /**
@@ -215,8 +210,8 @@ class SyncManager {
     
     // Exponential backoff on errors (max 30 seconds)
     const backoffInterval = Math.min(
-      this.ACTIVE_INTERVAL * Math.pow(2, this.pollingState.consecutiveErrors),
-      this.INACTIVE_INTERVAL
+      POLLING.ACTIVE * Math.pow(2, this.pollingState.consecutiveErrors),
+      POLLING.INACTIVE
     );
     this.pollingState.interval = backoffInterval;
   }
@@ -262,7 +257,7 @@ class SyncManager {
     if (immediate && this.gameCode) {
       // Cancel current timer and poll immediately
       this.stopPolling();
-      setTimeout(() => this.startPolling(), this.IMMEDIATE_POLL_DELAY);
+      setTimeout(() => this.startPolling(), POLLING.IMMEDIATE_DELAY);
     }
   }
 
