@@ -510,7 +510,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const hasWon = currentGame.settings ? checkWinCondition(
       playerState.markedPositions,
       currentGame.settings.gridSize,
-      currentGame.settings.requireFullCard,
     ) : false;
 
     console.log("[Multiplayer] Checking for win:", {
@@ -824,7 +823,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
         if (playerState && currentGame.settings && checkWinCondition(
           playerState.markedPositions,
           currentGame.settings.gridSize,
-          currentGame.settings.requireFullCard,
         )) {
           // We had a winning board but someone else claimed it first
           const timeDiff = Date.now() - mergedGame.winner.wonAt;

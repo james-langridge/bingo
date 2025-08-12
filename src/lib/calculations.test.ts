@@ -56,122 +56,71 @@ describe("generateAdminToken", () => {
 });
 
 describe("checkWinCondition", () => {
-  describe("with requireFullCard = false", () => {
-    test("detects horizontal win - first row", () => {
+  describe("always requires full card", () => {
+    test("returns false for horizontal line only", () => {
       const marked = [0, 1, 2, 3, 4];
-      expect(checkWinCondition(marked, 5, false)).toBe(true);
+      expect(checkWinCondition(marked, 5)).toBe(false);
     });
 
-    test("detects horizontal win - middle row", () => {
-      const marked = [10, 11, 12, 13, 14];
-      expect(checkWinCondition(marked, 5, false)).toBe(true);
-    });
-
-    test("detects horizontal win - last row", () => {
-      const marked = [20, 21, 22, 23, 24];
-      expect(checkWinCondition(marked, 5, false)).toBe(true);
-    });
-
-    test("detects vertical win - first column", () => {
+    test("returns false for vertical line only", () => {
       const marked = [0, 5, 10, 15, 20];
-      expect(checkWinCondition(marked, 5, false)).toBe(true);
+      expect(checkWinCondition(marked, 5)).toBe(false);
     });
 
-    test("detects vertical win - middle column", () => {
-      const marked = [2, 7, 12, 17, 22];
-      expect(checkWinCondition(marked, 5, false)).toBe(true);
-    });
-
-    test("detects vertical win - last column", () => {
-      const marked = [4, 9, 14, 19, 24];
-      expect(checkWinCondition(marked, 5, false)).toBe(true);
-    });
-
-    test("detects diagonal win - top-left to bottom-right", () => {
+    test("returns false for diagonal line only", () => {
       const marked = [0, 6, 12, 18, 24];
-      expect(checkWinCondition(marked, 5, false)).toBe(true);
+      expect(checkWinCondition(marked, 5)).toBe(false);
     });
 
-    test("detects diagonal win - top-right to bottom-left", () => {
-      const marked = [4, 8, 12, 16, 20];
-      expect(checkWinCondition(marked, 5, false)).toBe(true);
+    test("returns false for incomplete board", () => {
+      const marked = Array.from({ length: 24 }, (_, i) => i); // Missing one square
+      expect(checkWinCondition(marked, 5)).toBe(false);
     });
 
-    test("returns false for incomplete line", () => {
-      const marked = [0, 1, 2, 3]; // Missing one for complete row
-      expect(checkWinCondition(marked, 5, false)).toBe(false);
+    test("returns true only when all squares are marked - 5x5", () => {
+      const marked = Array.from({ length: 25 }, (_, i) => i);
+      expect(checkWinCondition(marked, 5)).toBe(true);
     });
 
-    test("returns false for random marks without line", () => {
-      const marked = [0, 7, 13, 19, 22];
-      expect(checkWinCondition(marked, 5, false)).toBe(false);
+    test("returns true only when all squares are marked - 3x3", () => {
+      const marked = Array.from({ length: 9 }, (_, i) => i);
+      expect(checkWinCondition(marked, 3)).toBe(true);
     });
 
-    test("works with 3x3 grid", () => {
-      const marked = [0, 1, 2]; // First row
-      expect(checkWinCondition(marked, 3, false)).toBe(true);
+    test("returns true only when all squares are marked - 4x4", () => {
+      const marked = Array.from({ length: 16 }, (_, i) => i);
+      expect(checkWinCondition(marked, 4)).toBe(true);
     });
 
-    test("works with 4x4 grid", () => {
-      const marked = [0, 5, 10, 15]; // First column
-      expect(checkWinCondition(marked, 4, false)).toBe(true);
-    });
-
-    test("handles diagonal in 3x3 grid", () => {
-      const marked = [0, 4, 8];
-      expect(checkWinCondition(marked, 3, false)).toBe(true);
-    });
-
-    test("handles diagonal in 4x4 grid", () => {
-      const marked = [3, 6, 9, 12]; // Anti-diagonal
-      expect(checkWinCondition(marked, 4, false)).toBe(true);
+    test("always requires full card", () => {
+      const partial = [0, 1, 2, 3, 4];
+      const full = Array.from({ length: 25 }, (_, i) => i);
+      
+      expect(checkWinCondition(partial, 5)).toBe(false);
+      expect(checkWinCondition(full, 5)).toBe(true);
     });
   });
 
-  describe("with requireFullCard = true", () => {
-    test("requires all positions marked for 5x5 grid", () => {
-      const allPositions = Array.from({ length: 25 }, (_, i) => i);
-      expect(checkWinCondition(allPositions, 5, true)).toBe(true);
-    });
-
-    test("returns false for partial card", () => {
-      const partial = Array.from({ length: 24 }, (_, i) => i);
-      expect(checkWinCondition(partial, 5, true)).toBe(false);
-    });
-
-    test("requires all positions for 3x3 grid", () => {
-      const allPositions = Array.from({ length: 9 }, (_, i) => i);
-      expect(checkWinCondition(allPositions, 3, true)).toBe(true);
-    });
-
-    test("requires all positions for 4x4 grid", () => {
-      const allPositions = Array.from({ length: 16 }, (_, i) => i);
-      expect(checkWinCondition(allPositions, 4, true)).toBe(true);
-    });
-
-    test("ignores line wins when full card required", () => {
-      const marked = [0, 1, 2, 3, 4]; // Complete row
-      expect(checkWinCondition(marked, 5, true)).toBe(false);
-    });
-  });
 
   describe("edge cases", () => {
     test("handles empty marked positions", () => {
-      expect(checkWinCondition([], 5, false)).toBe(false);
+      expect(checkWinCondition([], 5)).toBe(false);
     });
 
     test("handles single marked position", () => {
-      expect(checkWinCondition([12], 5, false)).toBe(false);
+      expect(checkWinCondition([12], 5)).toBe(false);
     });
 
     test("handles duplicate positions", () => {
       const marked = [0, 0, 1, 1, 2, 2, 3, 3, 4, 4];
-      expect(checkWinCondition(marked, 5, false)).toBe(true);
+      // Only 5 unique positions marked, not all 25
+      expect(checkWinCondition(marked, 5)).toBe(false);
     });
 
     test("handles positions out of order", () => {
       const marked = [4, 2, 0, 3, 1];
-      expect(checkWinCondition(marked, 5, false)).toBe(true);
+      // Only 5 positions marked, not all 25
+      expect(checkWinCondition(marked, 5)).toBe(false);
     });
   });
 });

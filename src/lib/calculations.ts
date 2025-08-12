@@ -18,64 +18,9 @@ export function generateAdminToken(): string {
 export function checkWinCondition(
   markedPositions: readonly number[],
   gridSize: number,
-  requireFullCard: boolean,
 ): boolean {
-  if (requireFullCard) {
-    return markedPositions.length === gridSize * gridSize;
-  }
-  // Check rows, columns, and diagonals
-  return checkLines(markedPositions, gridSize);
-}
-
-function checkLines(markedPositions: readonly number[], size: number): boolean {
-  // Work directly with positions
-  const positions = new Set(markedPositions);
-
-  // Check rows
-  for (let row = 0; row < size; row++) {
-    let complete = true;
-    for (let col = 0; col < size; col++) {
-      if (!positions.has(row * size + col)) {
-        complete = false;
-        break;
-      }
-    }
-    if (complete) return true;
-  }
-
-  // Check columns
-  for (let col = 0; col < size; col++) {
-    let complete = true;
-    for (let row = 0; row < size; row++) {
-      if (!positions.has(row * size + col)) {
-        complete = false;
-        break;
-      }
-    }
-    if (complete) return true;
-  }
-
-  // Check diagonal (top-left to bottom-right)
-  let diagonal1Complete = true;
-  for (let i = 0; i < size; i++) {
-    if (!positions.has(i * size + i)) {
-      diagonal1Complete = false;
-      break;
-    }
-  }
-  if (diagonal1Complete) return true;
-
-  // Check diagonal (top-right to bottom-left)
-  let diagonal2Complete = true;
-  for (let i = 0; i < size; i++) {
-    if (!positions.has(i * size + (size - 1 - i))) {
-      diagonal2Complete = false;
-      break;
-    }
-  }
-  if (diagonal2Complete) return true;
-
-  return false;
+  // Always require marking every single item to win
+  return markedPositions.length === gridSize * gridSize;
 }
 
 // Seeded random number generator for deterministic shuffling

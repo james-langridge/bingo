@@ -230,7 +230,6 @@ export function GamePlayer() {
     ? checkWinCondition(
         playerState.markedPositions,
         currentGame.settings.gridSize,
-        currentGame.settings.requireFullCard,
       )
     : false;
 
@@ -378,15 +377,9 @@ export function GamePlayer() {
             />
           </ErrorBoundary>
 
-          {currentGame.settings.requireFullCard ? (
-            <p className="text-center text-sm text-gray-600 mt-4">
-              Win condition: Mark all squares
-            </p>
-          ) : (
-            <p className="text-center text-sm text-gray-600 mt-4">
-              Win condition: Complete any row, column, or diagonal
-            </p>
-          )}
+          <p className="text-center text-sm text-gray-600 mt-4">
+            Win condition: Mark all squares
+          </p>
         </div>
       </div>
 
