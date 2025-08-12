@@ -27,7 +27,6 @@ import {
 import { TIMEOUTS } from "../lib/constants";
 
 interface GameStore {
-  // Immutable state
   currentGame: Game | null;
   playerState: PlayerState | null;
   localGames: readonly {
@@ -47,21 +46,18 @@ interface GameStore {
     winnerName: string;
     timeDifference: number;
     showNotification: boolean;
-  } | null; // For near miss notifications
+  } | null;
 
-  // Actions (thin layer over calculations)
   createGame: (title: string) => Promise<Game>;
   loadGame: (gameCode: string) => Promise<void>;
   loadGameAsAdmin: (gameCode: string, adminToken: string) => Promise<void>;
   updateGameItems: (items: BingoItem[]) => Promise<void>;
   deleteGame: (gameId: string) => Promise<void>;
 
-  // Player actions
   joinGame: (gameCode: string, displayName: string) => Promise<void>;
   markPosition: (position: number) => void;
   clearMarkedPositions: () => void;
 
-  // Multiplayer actions
   updatePlayerActivity: () => Promise<void>;
   checkForWinner: () => Promise<void>;
   announceWin: () => Promise<void>;
@@ -71,7 +67,6 @@ interface GameStore {
   handleRealtimeUpdate: (game: Game) => void;
   setConnectionStatus: (isConnected: boolean) => void;
 
-  // Initialize store
   initialize: () => Promise<void>;
 }
 
@@ -98,7 +93,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       settings: { gridSize: 5, requireFullCard: false, freeSpace: true },
       createdAt: Date.now(),
       lastModifiedAt: Date.now(),
-      players: [], // Initialize empty players array
+      players: [],
     };
 
     await saveGameLocal(game);
@@ -125,7 +120,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const game = await loadGameByCode(gameCode);
       const playerState = await loadPlayerState(gameCode);
 
-      // Only proceed if game exists
       if (!game) {
         set({
           currentGame: null,
@@ -136,8 +130,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
         return;
       }
 
-      // If we have a playerState, restore the currentPlayerId
-      // Find the player in the game's players list by matching display name
       let playerId = null;
       if (playerState) {
         const existingPlayer = game.players.find(
@@ -146,8 +138,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
         if (existingPlayer) {
           playerId = existingPlayer.id;
         } else {
-          // If player not found in list, generate new ID
-          // This handles edge cases where player state exists but player was removed
           playerId = crypto.randomUUID();
         }
       }
@@ -160,7 +150,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
         isLoading: false,
       });
 
-      // Connect to real-time updates if we're in a game
       const syncManager = getSyncManager({
         onGameUpdate: (updatedGame) => get().handleRealtimeUpdate(updatedGame),
         onConnectionChange: (isConnected) => get().setConnectionStatus(isConnected),
@@ -168,7 +157,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       });
       syncManager.connect(gameCode);
 
-      // Keep polling as fallback
       if (playerState) {
         get().startPolling();
       }
@@ -211,10 +199,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       lastModifiedAt: Date.now(),
     };
 
-    // Save locally first
     await saveGameLocal(updatedGame);
 
-    // Update local state immediately for optimistic update
     set(
       produce((draft: any) => {
         draft.currentGame = updatedGame;
@@ -232,7 +218,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }),
     );
 
-    // Sync to server if online (this was missing!)
     if (navigator.onLine && currentGame.adminToken) {
       try {
         const response = await fetch(`/api/game/${currentGame.gameCode}`, {
@@ -244,7 +229,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
         if (!response.ok) {
         } else {
           
-          // Trigger immediate poll for other players to get the update
           const syncManager = getSyncManager();
           if (syncManager) {
             syncManager.markActivity(true);
@@ -269,23 +253,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   joinGame: async (gameCode, displayName) => {
-    // Always fetch the latest game state from server first
     const game = await loadGameByCode(gameCode);
     if (!game) throw new Error("Game not found");
 
-    // Generate a unique player ID for this session
     const playerId = crypto.randomUUID();
     set({ currentPlayerId: playerId });
 
-    // Use a more robust player identification
-    // Players are unique by displayName within a game
     const existingPlayerIndex = game.players.findIndex(
       (p) => p.displayName === displayName,
     );
 
     let updatedPlayers = [...game.players];
     if (existingPlayerIndex >= 0) {
-      // Update existing player's info (they're back!)
       updatedPlayers[existingPlayerIndex] = {
         ...updatedPlayers[existingPlayerIndex],
         id: playerId,
@@ -293,7 +272,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
         isOnline: true,
       };
     } else {
-      // New player joining for the first time
       const newPlayer: Player = {
         id: playerId,
         displayName,
@@ -311,10 +289,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       lastModifiedAt: Date.now(),
     };
 
-    // Save updated game with new/returning player - this will sync to Redis
     await saveGameLocal(updatedGame);
 
-    // Force immediate sync to server
     if (navigator.onLine) {
       try {
         const response = await fetch(`/api/game/${gameCode}`, {
@@ -328,7 +304,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
     }
 
-    // Create or restore player state
     let playerState = await loadPlayerState(gameCode);
     if (!playerState || playerState.displayName !== displayName) {
       playerState = {
@@ -347,7 +322,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       lastServerState: updatedGame,
     });
 
-    // Connect to real-time updates
     const syncManager = getSyncManager({
       onGameUpdate: (updatedGame) => get().handleRealtimeUpdate(updatedGame),
       onConnectionChange: (isConnected) => get().setConnectionStatus(isConnected),
@@ -355,7 +329,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
     });
     syncManager.connect(gameCode);
 
-    // Start polling as fallback
     get().startPolling();
   },
 
@@ -363,26 +336,21 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { currentGame, currentPlayerId, playerState } = get();
     if (!currentGame || !playerState || !currentPlayerId) return;
 
-    // Check if player has won - if so, don't allow more marking
     if (playerState.hasWon || currentGame.winner) {
       return;
     }
 
-    // Mark activity for immediate polling
     const syncManager = getSyncManager();
     if (syncManager) {
       syncManager.markActivity(true);
     }
 
-    // Optimistic update for both player state and game items
     set(
       produce((draft: any) => {
         if (!draft.playerState || !draft.currentGame) return;
 
-        // Save current state for potential rollback
         draft.optimisticState = { ...draft.playerState };
 
-        // Update player's marked positions
         const marked = draft.playerState.markedPositions;
         const isUnmarking = marked.includes(position);
         
@@ -396,8 +364,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
         draft.playerState.lastSyncAt = Date.now();
 
-        // Update the item's markedBy array (vacation mode: multiple people can mark)
-        // Find the item by its position property, not array index!
         const itemIndex = draft.currentGame.items.findIndex(
           (item: any) => item.position === position
         );
@@ -410,13 +376,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
           );
 
           if (isUnmarking && existingMarkIndex >= 0) {
-            // Remove this player's mark
             draft.currentGame.items[itemIndex] = {
               ...item,
               markedBy: markedBy.filter((_: any, i: number) => i !== existingMarkIndex),
             };
           } else if (!isUnmarking && existingMarkIndex < 0) {
-            // Add this player's mark
             const newMark = {
               playerId: currentPlayerId,
               displayName: playerState.displayName,
@@ -431,15 +395,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }),
     );
 
-    // Save updated state
     const updatedState = get();
     if (updatedState.playerState && updatedState.currentGame) {
-      // Save both player state and game state
       Promise.all([
         savePlayerState(updatedState.playerState),
         saveGameLocal(updatedState.currentGame),
       ]).catch(() => {
-        // Rollback on failure
         set(
           produce((draft) => {
             if (draft.optimisticState) {
@@ -450,10 +411,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         );
       });
 
-      // Check if player has won after marking
       get().checkForWinner();
-      
-      // The sync is now handled by markActivity above
     }
   },
 
@@ -466,25 +424,21 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }),
     );
 
-    // Save updated player state
     const { playerState } = get();
     if (playerState) {
       savePlayerState(playerState);
     }
   },
 
-  // Update player's last seen time
   updatePlayerActivity: async () => {
     const { currentGame, playerState, currentPlayerId } = get();
     if (!currentGame || !playerState || !currentPlayerId) return;
 
-    // Mark activity for polling interval adjustment
     const syncManager = getSyncManager();
     if (syncManager) {
       syncManager.markActivity(false);
     }
 
-    // Only update if player exists in the list
     const playerExists = currentGame.players.some(p => p.id === currentPlayerId);
     if (!playerExists) {
       return;
@@ -502,38 +456,28 @@ export const useGameStore = create<GameStore>((set, get) => ({
       lastModifiedAt: Date.now(),
     };
 
-    // Save locally - this will also sync to server in background
     await saveGameLocal(updatedGame);
-    
-    // Don't update local state here to avoid conflicts with refreshGameState
-    // The next refresh will pull the updated state
   },
 
-  // Check if current player has won
   checkForWinner: async () => {
     const { currentGame, playerState } = get();
     if (!currentGame || !playerState) return;
     
-    // If player already marked as won, skip check
     if (playerState.hasWon) {
       return;
     }
     
-    // If game already has a winner and it's not us, don't check
     if (currentGame.winner && currentGame.winner.displayName !== playerState.displayName) {
       return;
     }
 
-    // Use actual number of items, not grid size squared
     const totalItems = currentGame.items.length;
     const hasWon = playerState.markedPositions.length === totalItems;
 
 
     if (hasWon) {
       
-      // Check if we already won (e.g., after page refresh)
       if (currentGame.winner?.displayName === playerState.displayName) {
-        // Just update local state
         const updatedPlayerState: PlayerState = {
           ...playerState,
           hasWon: true,
@@ -543,14 +487,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
         return;
       }
       
-      // Update player state
       const updatedPlayerState: PlayerState = {
         ...playerState,
         hasWon: true,
       };
       await savePlayerState(updatedPlayerState);
 
-      // Announce the win
       await get().announceWin();
     }
   },

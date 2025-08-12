@@ -17,40 +17,32 @@ interface TileSize {
   rows: number;
 }
 
-// Pure function to calculate tile size based on text length
 function calculateTileSize(text: string | undefined, seed: number): TileSize {
   const length = text?.length || 0;
   
-  // Use seed for deterministic "randomness" based on item properties
   const variant = seed % 10;
   
   if (length > 180) {
-    // Very long text: large tiles
     if (variant < 3) return { cols: 2, rows: 2 };
     if (variant < 6) return { cols: 3, rows: 1 };
     return { cols: 2, rows: 1 };
   } else if (length > 100) {
-    // Long text: medium-large tiles
     if (variant < 3) return { cols: 2, rows: 1 };
     if (variant < 5) return { cols: 1, rows: 2 };
     if (variant < 7) return { cols: 2, rows: 2 };
     return { cols: 1, rows: 1 };
   } else if (length > 50) {
-    // Medium text: varied tiles
     if (variant < 2) return { cols: 2, rows: 1 };
     if (variant < 3) return { cols: 1, rows: 2 };
     return { cols: 1, rows: 1 };
   } else if (length < 15) {
-    // Very short text: always small
     return { cols: 1, rows: 1 };
   } else {
-    // Short to medium text: mostly standard, some variation
     if (variant < 1) return { cols: 2, rows: 1 };
     return { cols: 1, rows: 1 };
   }
 }
 
-// Pure presentational component with creative masonry layout
 export const GameBoard = memo(
   ({
     items,
@@ -61,22 +53,18 @@ export const GameBoard = memo(
     currentPlayerId,
   }: GameBoardProps) => {
     const handleClick = (position: number) => {
-      // Add haptic feedback on mobile
       if (enableHaptic && "vibrate" in navigator) {
         navigator.vibrate(UI_CONFIG.HAPTIC_DURATION);
       }
       onItemClick(position);
     };
 
-    // Pre-calculate tile sizes for consistent layout
     const tileSizes = useMemo(() => {
       return items.map((item, index) => {
-        // Handle items without text
         if (!item?.text) {
           return { cols: 1, rows: 1 };
         }
         
-        // Use combination of text content and position for seed
         const textToUse = item.text || "";
         const seed = textToUse.charCodeAt(0) + 
                     textToUse.charCodeAt(Math.floor(textToUse.length / 2)) +
@@ -87,10 +75,7 @@ export const GameBoard = memo(
       });
     }, [items]);
 
-    // Determine base grid columns for responsive design
     const getGridColumns = () => {
-      // Use 6 columns on desktop for maximum flexibility
-      // This allows for 1x1, 2x1, 3x1, 2x2, etc combinations
       return 'repeat(6, 1fr)';
     };
 
@@ -106,7 +91,6 @@ export const GameBoard = memo(
         {items.map((item, index) => {
           const isMarkedByMe = markedPositions.includes(item.position);
           const markedBy = item.markedBy || [];
-          // Filter out the current player from markedBy list for display
           const markedByOthers = currentPlayerId 
             ? markedBy.filter(mark => mark.playerId !== currentPlayerId)
             : markedBy;
@@ -114,7 +98,6 @@ export const GameBoard = memo(
           const textLength = item.text?.length || 0;
           const tileSize = tileSizes[index];
           
-          // Calculate appropriate padding based on tile size and text length
           const getPadding = () => {
             const isLargeTile = tileSize.cols > 1 && tileSize.rows > 1;
             if (isLargeTile) return 'p-6 md:p-8';
@@ -124,7 +107,6 @@ export const GameBoard = memo(
             return 'p-2.5';
           };
 
-          // Dynamic font size based on text length and tile size
           const getFontSize = () => {
             const isLargeTile = tileSize.cols > 1 && tileSize.rows > 1;
             const isWideTile = tileSize.cols > 2;
@@ -137,7 +119,6 @@ export const GameBoard = memo(
             return '1rem';
           };
 
-          // Get initials for display
           const getInitials = (name: string) => {
             return name
               .split(' ')

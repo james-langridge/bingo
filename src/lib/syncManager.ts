@@ -55,10 +55,8 @@ class SyncManager {
       this.isDocumentVisible = !document.hidden;
       
       if (!wasVisible && this.isDocumentVisible && this.gameCode) {
-        // Tab became visible - immediately poll for updates
         this.pollNow();
       } else if (!this.isDocumentVisible) {
-        // Tab became hidden - pause polling
       }
     };
     
@@ -74,7 +72,6 @@ class SyncManager {
     this.gameCode = gameCode;
     this.pollingState.lastActivityTime = Date.now();
     
-    // Start polling immediately
     this.startPolling();
   }
 
@@ -85,22 +82,18 @@ class SyncManager {
     const now = Date.now();
     const timeSinceActivity = now - this.pollingState.lastActivityTime;
     
-    // If document is hidden, use a longer interval
     if (!this.isDocumentVisible) {
       return POLLING.INACTIVE;
     }
     
-    // Active play: < 1 minute since last activity
     if (timeSinceActivity < POLLING.IDLE_THRESHOLD) {
       return POLLING.ACTIVE;
     }
     
-    // Idle: 1-5 minutes since last activity
     if (timeSinceActivity < POLLING.INACTIVE_THRESHOLD) {
       return POLLING.IDLE;
     }
     
-    // Inactive: > 5 minutes since last activity
     return POLLING.INACTIVE;
   }
 
@@ -126,7 +119,6 @@ class SyncManager {
       });
       
       if (response.status === 304) {
-        // No changes
         this.handleSuccessfulPoll();
         return;
       }
@@ -154,23 +146,18 @@ class SyncManager {
     
     const { version, lastModifiedAt, changes, timestamp } = data;
     
-    // Update version tracking
     if (version !== this.pollingState.lastVersion) {
       this.pollingState.lastVersion = version;
       this.pollingState.lastSyncTime = lastModifiedAt || timestamp;
       
-      // Process game update if we have changes
       if (changes) {
         if (changes.fullUpdate && changes.game) {
           this.callbacks.onGameUpdate(changes.game);
           
-          // Check for winner announcement
           if (changes.game.winner && this.callbacks.onWinnerAnnounced) {
             this.callbacks.onWinnerAnnounced(changes.game.winner.displayName);
           }
         } else {
-          // Handle incremental update
-          // The store will handle merging the partial data
           this.callbacks.onGameUpdate({
             players: changes.players,
             winner: changes.winner,
@@ -202,13 +189,11 @@ class SyncManager {
   private handlePollError(_error: any) {
     this.pollingState.consecutiveErrors++;
     
-    // Mark as disconnected after 3 consecutive errors
     if (this.pollingState.consecutiveErrors >= 3 && this.isConnected) {
       this.isConnected = false;
       this.callbacks.onConnectionChange(false);
     }
     
-    // Exponential backoff on errors (max 30 seconds)
     const backoffInterval = Math.min(
       POLLING.ACTIVE * Math.pow(2, this.pollingState.consecutiveErrors),
       POLLING.INACTIVE
@@ -225,16 +210,13 @@ class SyncManager {
     const pollAndSchedule = async () => {
       await this.poll();
       
-      // Calculate next interval
       this.pollingState.interval = this.calculateInterval();
       
-      // Schedule next poll if still connected
       if (this.gameCode) {
         this.pollingTimer = setTimeout(pollAndSchedule, this.pollingState.interval);
       }
     };
     
-    // Start immediately
     pollAndSchedule();
   }
 
@@ -255,7 +237,6 @@ class SyncManager {
     this.pollingState.lastActivityTime = Date.now();
     
     if (immediate && this.gameCode) {
-      // Cancel current timer and poll immediately
       this.stopPolling();
       setTimeout(() => this.startPolling(), POLLING.IMMEDIATE_DELAY);
     }
@@ -312,7 +293,6 @@ class SyncManager {
   }
 }
 
-// Singleton instance
 let syncManagerInstance: SyncManager | null = null;
 
 export function getSyncManager(callbacks?: SyncCallbacks): SyncManager {
@@ -334,28 +314,22 @@ export function resetSyncManager() {
  */
 
 export function mergeGameStates(local: Game, remote: Game): Game {
-  // Remote is source of truth, but preserve local admin token if present
   const merged: Game = {
     ...remote,
     adminToken: local.adminToken || remote.adminToken,
   };
 
-  // Merge items to preserve markedBy data (vacation mode feature) and all fields
   const mergedItems = remote.items.map((remoteItem, index) => {
     const localItem = local.items[index];
     
-    // Start with local item to preserve all fields, then overlay remote updates
     const baseItem = localItem || remoteItem;
     
-    // Merge markedBy arrays
     const markedByMap = new Map();
     
-    // Add remote marks first
     remoteItem.markedBy?.forEach(mark => {
       markedByMap.set(mark.playerId, mark);
     });
     
-    // Add or update with local marks (might be more recent)
     localItem?.markedBy?.forEach(mark => {
       const existing = markedByMap.get(mark.playerId);
       if (!existing || mark.markedAt > existing.markedAt) {
@@ -364,9 +338,8 @@ export function mergeGameStates(local: Game, remote: Game): Game {
     });
     
     return {
-      ...baseItem,  // Start with all fields from local (including text)
-      ...remoteItem, // Overlay remote updates
-      // Ensure critical fields are preserved
+      ...baseItem,
+      ...remoteItem,
       text: remoteItem.text || baseItem.text,
       position: remoteItem.position ?? baseItem.position,
       id: remoteItem.id || baseItem.id,
@@ -374,19 +347,15 @@ export function mergeGameStates(local: Game, remote: Game): Game {
     };
   });
 
-  // Merge players list without duplicates
   const playerMap = new Map<string, any>();
   
-  // Add all remote players first (source of truth)
   remote.players?.forEach(player => {
     playerMap.set(player.displayName, player);
   });
 
-  // Update with any local player that might have more recent activity
   local.players?.forEach(player => {
     const existing = playerMap.get(player.displayName);
     if (existing) {
-      // Keep the more recent lastSeenAt
       if (player.lastSeenAt > existing.lastSeenAt) {
         playerMap.set(player.displayName, {
           ...existing,
@@ -401,15 +370,14 @@ export function mergeGameStates(local: Game, remote: Game): Game {
     ...merged,
     items: mergedItems,
     players: Array.from(playerMap.values()),
-    winner: remote.winner, // Always use remote winner (source of truth)
+    winner: remote.winner,
   };
 }
 
 export function mergePlayerStates(local: PlayerState, remote: PlayerState): PlayerState {
-  // For player state, local changes take precedence (user's own actions)
   return {
     ...remote,
-    markedPositions: local.markedPositions, // Keep user's local marks
+    markedPositions: local.markedPositions,
     displayName: local.displayName,
     lastSyncAt: Math.max(local.lastSyncAt, remote.lastSyncAt || 0),
   };
