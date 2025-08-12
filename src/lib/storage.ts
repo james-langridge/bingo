@@ -24,52 +24,33 @@ const SYNC_THROTTLE_MS = 1000; // Minimum 1 second between syncs per game
 
 // Backend sync functions with throttling and retry logic
 async function syncGameToServer(game: Game): Promise<boolean> {
-  const startTime = performance.now();
   
   // Check throttle
   const lastSync = syncThrottle.get(game.gameCode) || 0;
   const timeSinceLastSync = Date.now() - lastSync;
   if (timeSinceLastSync < SYNC_THROTTLE_MS) {
-    console.log(`[Storage] Throttling sync for game ${game.gameCode} (${timeSinceLastSync}ms since last sync)`);
     return false;
   }
   
   try {
-    console.log(`[Storage] Syncing game ${game.gameCode} to server...`);
     const response = await fetch(`/api/game/${game.gameCode}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(game),
     });
 
-    const duration = Math.round(performance.now() - startTime);
     if (response.ok) {
-      console.log(
-        `[Storage] ✅ Game ${game.gameCode} synced successfully (${duration}ms)`,
-      );
       syncThrottle.set(game.gameCode, Date.now());
-    } else {
-      console.warn(
-        `[Storage] ⚠️ Game ${game.gameCode} sync failed: ${response.status} ${response.statusText} (${duration}ms)`,
-      );
     }
     return response.ok;
   } catch (error) {
-    const duration = Math.round(performance.now() - startTime);
-    console.error(
-      `[Storage] ❌ Failed to sync game ${game.gameCode} to server (${duration}ms):`,
-      error,
-    );
     return false;
   }
 }
 
 async function fetchGameFromServer(gameCode: string): Promise<Game | null> {
-  const startTime = performance.now();
   try {
-    console.log(`[Storage] Fetching game ${gameCode} from server...`);
     const response = await fetch(`/api/game/${gameCode}`);
-    const duration = Math.round(performance.now() - startTime);
 
     if (response.ok) {
       // Check if response is JSON
@@ -79,80 +60,32 @@ async function fetchGameFromServer(gameCode: string): Promise<Game | null> {
 
         // Validate we got a proper game object
         if (!game || typeof game !== "object") {
-          console.error(
-            `[Storage] Invalid game data from server:`,
-            typeof game,
-          );
           return null;
         }
 
-        console.log(
-          `[Storage] ✅ Game ${gameCode} fetched from server (${duration}ms)`,
-        );
-        console.log(`[Storage] Game has winner:`, !!game.winner, game.winner);
-        console.log(`[Storage] Game has ${game.players?.length || 0} players`);
         return game;
       } else {
         // Non-JSON response (likely HTML error page)
-        const text = await response.text();
-        console.error(
-          `[Storage] ⚠️ Server returned non-JSON response for game ${gameCode} (${duration}ms)`,
-        );
-        console.error(`[Storage] Response preview: ${text.substring(0, 200)}`);
+        await response.text();
         return null;
       }
-    } else if (response.status === 404) {
-      console.log(
-        `[Storage] ℹ️ Game ${gameCode} not found on server (${duration}ms)`,
-      );
-    } else if (response.status === 503) {
-      const errorData = await response.json().catch(() => null);
-      console.error(
-        `[Storage] ⚠️ Storage service unavailable (${duration}ms):`,
-        errorData?.details || response.statusText,
-      );
-    } else {
-      console.warn(
-        `[Storage] ⚠️ Failed to fetch game ${gameCode}: ${response.status} ${response.statusText} (${duration}ms)`,
-      );
     }
   } catch (error) {
-    const duration = Math.round(performance.now() - startTime);
-    console.error(
-      `[Storage] ❌ Failed to fetch game ${gameCode} from server (${duration}ms):`,
-      error,
-    );
+    // Error handled silently
   }
   return null;
 }
 
 async function syncPlayerStateToServer(state: PlayerState): Promise<boolean> {
-  const startTime = performance.now();
   try {
-    console.log(`[Storage] Syncing player state for game ${state.gameCode}...`);
     const response = await fetch(`/api/player/${state.gameCode}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(state),
     });
 
-    const duration = Math.round(performance.now() - startTime);
-    if (response.ok) {
-      console.log(
-        `[Storage] ✅ Player state synced for game ${state.gameCode} (${duration}ms)`,
-      );
-    } else {
-      console.warn(
-        `[Storage] ⚠️ Player state sync failed: ${response.status} ${response.statusText} (${duration}ms)`,
-      );
-    }
     return response.ok;
   } catch (error) {
-    const duration = Math.round(performance.now() - startTime);
-    console.error(
-      `[Storage] ❌ Failed to sync player state (${duration}ms):`,
-      error,
-    );
     return false;
   }
 }
@@ -161,7 +94,6 @@ async function syncPlayerStateToServer(state: PlayerState): Promise<boolean> {
 export async function saveGameLocal(game: Game): Promise<void> {
   // Validate game object before saving
   if (!game || !game.id || !game.gameCode) {
-    console.error("[Storage] Invalid game object, skipping save:", game);
     return;
   }
 
@@ -187,7 +119,6 @@ export async function loadLocalGames(): Promise<Game[]> {
 export async function loadGameByCode(
   gameCode: string,
 ): Promise<Game | undefined> {
-  console.log(`[Storage] Loading game ${gameCode}...`);
 
   // Get local version first as fallback
   let localGame = await db.games.where("gameCode").equals(gameCode).first();
@@ -231,24 +162,15 @@ export async function loadGameByCode(
       
       // Cache the latest version locally
       await db.games.put(mergedGame);
-      console.log(
-        `[Storage] ✅ Game ${gameCode} fetched from server (${mergedGame.players?.length || 0} players)`,
-      );
       return mergedGame;
     } else if (localGame) {
       // Server fetch failed but we have local version
-      console.log(`[Storage] ⚠️ Using local cache for game ${gameCode}`);
       return localGame;
     }
   } else {
     // Offline - use local version if available
     if (localGame) {
-      console.log(`[Storage] ✅ Game ${gameCode} loaded from local cache (offline)`);
       return localGame;
-    } else {
-      console.log(
-        `[Storage] ⚠️ Offline - cannot fetch game ${gameCode} from server`,
-      );
     }
   }
 
@@ -268,7 +190,6 @@ export async function deleteGameLocal(gameId: string): Promise<void> {
 export async function savePlayerState(playerState: PlayerState): Promise<void> {
   // Validate player state before saving
   if (!playerState || !playerState.gameCode) {
-    console.error("[Storage] Invalid player state, skipping save:", playerState);
     return;
   }
 
@@ -299,16 +220,10 @@ export async function queueEvent(event: GameEvent): Promise<void> {
 
 export async function processPendingEvents(): Promise<void> {
   if (!navigator.onLine) {
-    console.log("[Storage] Offline - skipping sync");
     return;
   }
 
-  console.log("[Storage] Processing pending sync operations...");
-
   const events = await db.pendingEvents.toArray();
-  if (events.length > 0) {
-    console.log(`[Storage] Found ${events.length} pending events`);
-  }
 
   for (const event of events) {
     try {
@@ -324,12 +239,8 @@ export async function processPendingEvents(): Promise<void> {
   // Also sync any unsaved games
   const games = await db.games.toArray();
   if (games.length > 0) {
-    console.log(`[Storage] Syncing ${games.length} local games to server...`);
-    let syncCount = 0;
     for (const game of games) {
-      const success = await syncGameToServer(game);
-      if (success) syncCount++;
+      await syncGameToServer(game);
     }
-    console.log(`[Storage] ✅ Synced ${syncCount}/${games.length} games`);
   }
 }

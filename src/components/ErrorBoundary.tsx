@@ -32,14 +32,7 @@ function logError(error: Error, errorInfo: ErrorInfo | null, context?: string) {
 
   // In development, log to console with full details
   if (import.meta.env.DEV) {
-    console.group(`🚨 Error Boundary Caught Error ${context ? `in ${context}` : ''}`);
     console.error('Error:', error);
-    console.error('Error Info:', errorInfo);
-    console.error('Full Error Data:', errorData);
-    console.groupEnd();
-  } else {
-    // In production, log minimal info
-    console.error(`Error in ${context || 'app'}:`, error.message);
   }
 
   // Store error in localStorage for debugging
@@ -113,10 +106,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     }));
 
     // If too many errors in short time, might be an error loop
-    const now = Date.now();
-    if (this.state.lastErrorTime && now - this.state.lastErrorTime < 1000) {
-      console.error('Error loop detected, stopping error boundary recovery');
-    }
   }
 
   resetErrorBoundary = () => {

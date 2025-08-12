@@ -61,11 +61,9 @@ class SyncManager {
       
       if (!wasVisible && this.isDocumentVisible && this.gameCode) {
         // Tab became visible - immediately poll for updates
-        console.log("[SyncManager] Tab became visible, polling immediately");
         this.pollNow();
       } else if (!this.isDocumentVisible) {
         // Tab became hidden - pause polling
-        console.log("[SyncManager] Tab hidden, pausing polling");
       }
     };
     
@@ -80,7 +78,6 @@ class SyncManager {
     
     this.gameCode = gameCode;
     this.pollingState.lastActivityTime = Date.now();
-    console.log(`[SyncManager] Starting smart polling for game ${gameCode}`);
     
     // Start polling immediately
     this.startPolling();
@@ -157,7 +154,6 @@ class SyncManager {
    */
   private handlePollResponse(data: any) {
     if (!data) {
-      console.warn("[SyncManager] Received empty poll response");
       return;
     }
     
@@ -171,7 +167,6 @@ class SyncManager {
       // Process game update if we have changes
       if (changes) {
         if (changes.fullUpdate && changes.game) {
-          console.log("[SyncManager] Full game update received");
           this.callbacks.onGameUpdate(changes.game);
           
           // Check for winner announcement
@@ -180,7 +175,6 @@ class SyncManager {
           }
         } else {
           // Handle incremental update
-          console.log("[SyncManager] Incremental update received");
           // The store will handle merging the partial data
           this.callbacks.onGameUpdate({
             players: changes.players,
@@ -199,7 +193,6 @@ class SyncManager {
   private handleSuccessfulPoll() {
     if (this.pollingState.consecutiveErrors > 0) {
       this.pollingState.consecutiveErrors = 0;
-      console.log("[SyncManager] Connection restored");
     }
     
     if (!this.isConnected) {
@@ -211,9 +204,8 @@ class SyncManager {
   /**
    * Handle polling error
    */
-  private handlePollError(error: any) {
+  private handlePollError(_error: any) {
     this.pollingState.consecutiveErrors++;
-    console.error("[SyncManager] Polling error:", error);
     
     // Mark as disconnected after 3 consecutive errors
     if (this.pollingState.consecutiveErrors >= 3 && this.isConnected) {
@@ -287,7 +279,6 @@ class SyncManager {
    * Disconnect and cleanup
    */
   disconnect() {
-    console.log("[SyncManager] Stopping polling");
     this.stopPolling();
     this.gameCode = null;
     
@@ -309,7 +300,6 @@ class SyncManager {
    */
   reconnect() {
     if (this.gameCode) {
-      console.log("[SyncManager] Reconnecting...");
       this.pollingState.consecutiveErrors = 0;
       this.startPolling();
     }

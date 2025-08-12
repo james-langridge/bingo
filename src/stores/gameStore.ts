@@ -163,9 +163,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const syncManager = getSyncManager({
         onGameUpdate: (updatedGame) => get().handleRealtimeUpdate(updatedGame),
         onConnectionChange: (isConnected) => get().setConnectionStatus(isConnected),
-        onWinnerAnnounced: (winnerName) => {
-          console.log(`[GameStore] Winner announced: ${winnerName}`);
-        },
+        onWinnerAnnounced: () => {},
       });
       syncManager.connect(gameCode);
 
@@ -174,7 +172,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
         get().startPolling();
       }
     } catch (error) {
-      console.error("[GameStore] Failed to load game:", error);
       set({
         currentGame: null,
         playerState: null,
@@ -218,7 +215,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     // Update local state immediately for optimistic update
     set(
-      produce((draft) => {
+      produce((draft: any) => {
         draft.currentGame = updatedGame;
         const gameIndex = draft.localGames.findIndex(
           (g: any) => g.id === updatedGame.id,
@@ -244,9 +241,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         });
         
         if (!response.ok) {
-          console.error("[GameStore] Failed to sync game items to server:", response.status);
         } else {
-          console.log("[GameStore] Game items synced to server successfully");
           
           // Trigger immediate poll for other players to get the update
           const syncManager = getSyncManager();
@@ -255,7 +250,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
           }
         }
       } catch (error) {
-        console.error("[GameStore] Error syncing game items to server:", error);
       }
     }
   },
@@ -264,7 +258,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     await deleteGameLocal(gameId);
 
     set(
-      produce((draft) => {
+      produce((draft: any) => {
         draft.localGames = draft.localGames.filter((g: any) => g.id !== gameId);
         if (draft.currentGame?.id === gameId) {
           draft.currentGame = null;
@@ -328,10 +322,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
           body: JSON.stringify(updatedGame),
         });
         if (response.ok) {
-          console.log("[GameStore] Player join synced to server immediately");
         }
       } catch (error) {
-        console.error("[GameStore] Failed to sync player join:", error);
       }
     }
 
@@ -358,9 +350,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const syncManager = getSyncManager({
       onGameUpdate: (updatedGame) => get().handleRealtimeUpdate(updatedGame),
       onConnectionChange: (isConnected) => get().setConnectionStatus(isConnected),
-      onWinnerAnnounced: (winnerName) => {
-        console.log(`[GameStore] Winner announced: ${winnerName}`);
-      },
+      onWinnerAnnounced: () => {},
     });
     syncManager.connect(gameCode);
 
@@ -374,20 +364,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     // Check if player has won - if so, don't allow more marking
     if (playerState.hasWon || currentGame.winner) {
-      console.log("[GameStore] Game already won, ignoring mark");
       return;
     }
-
-    const totalItems = currentGame.items.length;
-    console.log("[GameStore] Marking position:", {
-      position,
-      currentMarkedCount: playerState.markedPositions.length,
-      totalItems,
-      gridSize: currentGame.settings?.gridSize,
-      actualItemsInGame: currentGame.items.length,
-      willBeComplete: !playerState.markedPositions.includes(position) && 
-                      playerState.markedPositions.length + 1 === totalItems,
-    });
 
     // Mark activity for immediate polling
     const syncManager = getSyncManager();
@@ -397,7 +375,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     // Optimistic update for both player state and game items
     set(
-      produce((draft) => {
+      produce((draft: any) => {
         if (!draft.playerState || !draft.currentGame) return;
 
         // Save current state for potential rollback
@@ -459,8 +437,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       Promise.all([
         savePlayerState(updatedState.playerState),
         saveGameLocal(updatedState.currentGame),
-      ]).catch((error) => {
-        console.error("[GameStore] Failed to save state:", error);
+      ]).catch(() => {
         // Rollback on failure
         set(
           produce((draft) => {
@@ -476,7 +453,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       get().checkForWinner();
       
       // The sync is now handled by markActivity above
-      console.log("[GameStore] Square marked, polling triggered");
     }
   },
 
@@ -510,7 +486,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // Only update if player exists in the list
     const playerExists = currentGame.players.some(p => p.id === currentPlayerId);
     if (!playerExists) {
-      console.log("[GameStore] Player not in list, skipping activity update");
       return;
     }
 
@@ -540,13 +515,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
     
     // If player already marked as won, skip check
     if (playerState.hasWon) {
-      console.log("[Multiplayer] Player already marked as winner, skipping check");
       return;
     }
     
     // If game already has a winner and it's not us, don't check
     if (currentGame.winner && currentGame.winner.displayName !== playerState.displayName) {
-      console.log("[Multiplayer] Game already has a different winner, skipping check");
       return;
     }
 
@@ -554,22 +527,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const totalItems = currentGame.items.length;
     const hasWon = playerState.markedPositions.length === totalItems;
 
-    console.log("[Multiplayer] Checking for win:", {
-      hasWon,
-      markedPositions: playerState.markedPositions,
-      markedCount: playerState.markedPositions.length,
-      totalItems,
-      gridSize: currentGame.settings?.gridSize,
-      actualItemsInGame: currentGame.items.length,
-      winConditionMet: playerState.markedPositions.length === totalItems,
-    });
 
     if (hasWon) {
-      console.log("[Multiplayer] Player has won! Announcing win...");
       
       // Check if we already won (e.g., after page refresh)
       if (currentGame.winner?.displayName === playerState.displayName) {
-        console.log("[Multiplayer] We already won this game (possibly after refresh)");
         // Just update local state
         const updatedPlayerState: PlayerState = {
           ...playerState,
@@ -597,7 +559,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { currentGame, playerState, currentPlayerId } = get();
     if (!currentGame || !playerState || !currentPlayerId) return;
 
-    console.log("[Multiplayer] Attempting to announce win...");
 
     // Trigger immediate poll after win announcement
     const syncManager = getSyncManager();
@@ -612,23 +573,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const response = await fetch(`/api/game/${currentGame.gameCode}`);
         if (response.ok) {
           latestGame = await response.json();
-          console.log("[Multiplayer] Fetched latest game state:", {
-            hasWinner: !!latestGame?.winner,
-            winnerName: latestGame?.winner?.displayName,
-          });
         }
       } catch (error) {
-        console.error("[Multiplayer] Failed to fetch latest game state:", error);
       }
     }
 
     // Step 2: Check if someone already won
     if (latestGame?.winner) {
-      console.log("[Multiplayer] Someone already won:", latestGame.winner.displayName);
       
       // Check if WE are the winner (this can happen if we already won but are retrying)
       if (latestGame.winner.playerId === currentPlayerId) {
-        console.log("[Multiplayer] We are already the winner!");
         // Update local state to confirm we won
         set({
           currentGame: latestGame,
@@ -670,7 +624,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       winningPositions, // For audit/verification
     };
 
-    console.log("[Multiplayer] Attempting to claim victory:", winner);
 
     // Step 4: Show optimistic UI immediately
     const optimisticGame: Game = {
@@ -710,7 +663,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const result = await response.json();
 
         if (response.ok && result.accepted) {
-          console.log("[Multiplayer] Win claim accepted! You are the winner!");
           // Update with server-confirmed winner info
           const confirmedGame = result.game;
           set({
@@ -720,7 +672,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
             nearMissInfo: null, // Clear any near-miss notification since we won
           });
         } else if (result.actualWinner) {
-          console.log("[Multiplayer] Win claim rejected. Actual winner:", result.actualWinner.displayName);
           
           // Rollback optimistic update
           const actualGame = result.game;
@@ -744,20 +695,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
           }
         }
       } catch (error) {
-        console.error("[Multiplayer] Failed to claim victory:", error);
         // Keep optimistic update but mark as unconfirmed
         set({ optimisticWinClaim: false });
       }
     } else {
       // Offline - keep optimistic update, will verify when back online
-      console.log("[Multiplayer] Offline - win claim will be verified when connection restored");
     }
   },
 
   // Start polling for game updates
   startPolling: () => {
     // Polling is now handled by SyncManager with smart intervals
-    console.log("[Polling] Polling is handled by SyncManager");
     const syncManager = getSyncManager();
     if (syncManager) {
       syncManager.pollNow();
@@ -803,11 +751,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
         get().handleRealtimeUpdate(latestGame);
       } else {
         // Game might have been deleted or is temporarily unavailable
-        console.warn(`[GameStore] Game ${currentGame.gameCode} not found during refresh`);
         // Don't throw an error - just skip the update
       }
     } catch (error) {
-      console.error("[GameStore] Failed to refresh game state:", error);
       // Don't throw - just log the error to avoid triggering ErrorBoundary
     }
   },
@@ -868,18 +814,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     // Check if there's a new winner
     if (mergedGame.winner && !currentGame.winner) {
-      console.log("[Multiplayer] New winner detected:", mergedGame.winner);
       
       // Check if WE are the winner
       if (mergedGame.winner.playerId === currentPlayerId) {
-        console.log("[Multiplayer] We are the winner! Clearing any near-miss notifications.");
         // Clear any near-miss notification since we're the winner
         set(produce(draft => {
           draft.nearMissInfo = null;
         }));
       } else {
         // Someone else won, show near-miss notification if we were close
-        console.log("[Multiplayer] Another player has won the game!");
         
         // Check if we had a winning board (near miss scenario)
         if (playerState && currentGame.items && 
@@ -903,7 +846,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const currentPlayerCount = currentGame.players?.length || 0;
     const latestPlayerCount = mergedGame.players?.length || 0;
     if (latestPlayerCount > currentPlayerCount) {
-      console.log(`[Multiplayer] New players joined! (${currentPlayerCount} -> ${latestPlayerCount})`);
     }
 
     // Mark currently active players
@@ -947,13 +889,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setConnectionStatus: (isConnected: boolean) => {
     const previouslyConnected = get().isConnected;
     set({ isConnected });
-    console.log(`[GameStore] Connection status: ${isConnected ? "Connected" : "Disconnected"}`);
     
     // When reconnecting, check if we have an unconfirmed win claim
     if (!previouslyConnected && isConnected) {
       const { optimisticWinClaim, playerState } = get();
       if (optimisticWinClaim && playerState?.hasWon) {
-        console.log("[GameStore] Reconnected with unconfirmed win claim, verifying...");
         // Re-attempt to claim the win
         get().announceWin();
       }
