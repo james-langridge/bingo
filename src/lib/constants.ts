@@ -48,3 +48,21 @@ export const UI_CONFIG = {
   TOAST_DURATION: 3_000,       // 3 seconds for toast notifications
   DEBOUNCE_DELAY: 300,         // 300ms debounce for inputs
 } as const;
+
+// Grid and tile configuration
+export const GRID_CONFIG = {
+  MOBILE_COLUMNS: 3,           // 3 columns on mobile
+  TABLET_COLUMNS: 4,           // 4 columns on tablet
+  DESKTOP_COLUMNS: 6,          // 6 columns on desktop
+  WIDE_COLUMNS: 8,             // 8 columns on wide screens
+  MIN_TILE_HEIGHT: 90,         // 90px minimum tile height
+  AUTO_ROW_HEIGHT: 'minmax(90px, auto)',
+} as const;
+
+// Text length thresholds for tile sizing
+export const TEXT_LENGTH_THRESHOLDS = {
+  SHORT: 15,                   // Very short text
+  MEDIUM: 50,                  // Medium length text
+  LONG: 100,                   // Long text
+  EXTRA_LONG: 180,             // Extra long text
+} as const;
