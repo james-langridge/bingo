@@ -293,8 +293,8 @@ describe("gameStore", () => {
       });
 
       const newItems: BingoItem[] = [
-        { id: "1", text: "Item 1", position: 0 },
-        { id: "2", text: "Item 2", position: 1 },
+        { id: crypto.randomUUID(), text: "Item 1", position: 0 },
+        { id: crypto.randomUUID(), text: "Item 2", position: 1 },
       ];
 
       await act(async () => {
@@ -333,7 +333,7 @@ describe("gameStore", () => {
       });
 
       const newItems: BingoItem[] = [
-        { id: "1", text: "Updated Item", position: 0 },
+        { id: crypto.randomUUID(), text: "Updated Item", position: 0 },
       ];
 
       await act(async () => {

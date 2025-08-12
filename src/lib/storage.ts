@@ -1,6 +1,8 @@
 import Dexie, { type Table } from "dexie";
 import type { Game, PlayerState, GameEvent } from "../types/types.ts";
 import { STORAGE, TIMEOUTS } from "./constants";
+import { GameSchema, PlayerStateSchema } from "../schemas/gameSchemas";
+import { safeValidate } from "../schemas/validation";
 
 class BingoDB extends Dexie {
   games!: Table<Game>;
@@ -84,7 +86,9 @@ async function syncPlayerStateToServer(state: PlayerState): Promise<boolean> {
 }
 
 export async function saveGameLocal(game: Game): Promise<void> {
-  if (!game || !game.id || !game.gameCode) {
+  const validation = safeValidate(GameSchema, game);
+  if (!validation.success) {
+    console.error("Invalid game data:", validation.error);
     return;
   }
 
@@ -165,7 +169,9 @@ export async function deleteGameLocal(gameId: string): Promise<void> {
 }
 
 export async function savePlayerState(playerState: PlayerState): Promise<void> {
-  if (!playerState || !playerState.gameCode) {
+  const validation = safeValidate(PlayerStateSchema, playerState);
+  if (!validation.success) {
+    console.error("Invalid player state:", validation.error);
     return;
   }
 
