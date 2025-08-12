@@ -8,7 +8,7 @@ import { ErrorBoundary } from "./ErrorBoundary";
 import { NearMissNotification } from "./NearMissNotification";
 import { WinnerNotification } from "./WinnerNotification";
 import { usePullToRefresh } from "../hooks/usePullToRefresh";
-import { checkWinCondition, shuffleItems } from "../lib/calculations";
+import { shuffleItems } from "../lib/calculations";
 
 export function GamePlayer() {
   const navigate = useNavigate();
@@ -226,11 +226,8 @@ export function GamePlayer() {
     );
   }
 
-  const hasWon = playerState && currentGame.settings
-    ? checkWinCondition(
-        playerState.markedPositions,
-        currentGame.settings.gridSize,
-      )
+  const hasWon = playerState && currentGame.items
+    ? playerState.markedPositions.length === currentGame.items.length
     : false;
 
   return (

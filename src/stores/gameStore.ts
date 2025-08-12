@@ -10,7 +10,6 @@ import type {
 import {
   generateGameCode,
   generateAdminToken,
-  checkWinCondition,
 } from "../lib/calculations";
 import {
   saveGameLocal,
@@ -379,14 +378,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
       return;
     }
 
-    const totalSquares = currentGame.settings ? currentGame.settings.gridSize * currentGame.settings.gridSize : 0;
+    const totalItems = currentGame.items.length;
     console.log("[GameStore] Marking position:", {
       position,
       currentMarkedCount: playerState.markedPositions.length,
-      totalSquares,
+      totalItems,
       gridSize: currentGame.settings?.gridSize,
+      actualItemsInGame: currentGame.items.length,
       willBeComplete: !playerState.markedPositions.includes(position) && 
-                      playerState.markedPositions.length + 1 === totalSquares,
+                      playerState.markedPositions.length + 1 === totalItems,
     });
 
     // Mark activity for immediate polling
@@ -550,20 +550,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
       return;
     }
 
-    const totalSquares = currentGame.settings ? currentGame.settings.gridSize * currentGame.settings.gridSize : 0;
-    const hasWon = currentGame.settings ? checkWinCondition(
-      playerState.markedPositions,
-      currentGame.settings.gridSize,
-    ) : false;
+    // Use actual number of items, not grid size squared
+    const totalItems = currentGame.items.length;
+    const hasWon = playerState.markedPositions.length === totalItems;
 
     console.log("[Multiplayer] Checking for win:", {
       hasWon,
       markedPositions: playerState.markedPositions,
       markedCount: playerState.markedPositions.length,
-      totalSquares,
+      totalItems,
       gridSize: currentGame.settings?.gridSize,
-      requireFullCard: currentGame.settings?.requireFullCard,
-      winConditionMet: playerState.markedPositions.length === totalSquares,
+      actualItemsInGame: currentGame.items.length,
+      winConditionMet: playerState.markedPositions.length === totalItems,
     });
 
     if (hasWon) {
@@ -884,10 +882,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
         console.log("[Multiplayer] Another player has won the game!");
         
         // Check if we had a winning board (near miss scenario)
-        if (playerState && currentGame.settings && checkWinCondition(
-          playerState.markedPositions,
-          currentGame.settings.gridSize,
-        )) {
+        if (playerState && currentGame.items && 
+            playerState.markedPositions.length === currentGame.items.length) {
           // We had a winning board but someone else claimed it first
           const timeDiff = Date.now() - mergedGame.winner.wonAt;
           if (timeDiff < 5000) {

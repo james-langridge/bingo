@@ -329,10 +329,18 @@ describe("ErrorBoundary", () => {
 
   describe("GameErrorBoundary", () => {
     it("should display game-specific error UI", () => {
+      // Create a connection error to trigger the connection-specific UI
+      const ThrowConnectionError = ({ shouldThrow }: { shouldThrow: boolean }) => {
+        if (shouldThrow) {
+          throw new Error("Network fetch failed");
+        }
+        return <div>Content</div>;
+      };
+
       render(
         <BrowserRouter>
           <GameErrorBoundary>
-            <ThrowError shouldThrow={true} />
+            <ThrowConnectionError shouldThrow={true} />
           </GameErrorBoundary>
         </BrowserRouter>
       );
@@ -381,7 +389,8 @@ describe("ErrorBoundary", () => {
         </BrowserRouter>
       );
 
-      fireEvent.click(screen.getByText("Rejoin Game"));
+      // When there's no game code, the button says "Try Again" not "Rejoin Game"
+      fireEvent.click(screen.getByText("Try Again"));
       expect(window.location.href).toBe("/");
     });
   });
