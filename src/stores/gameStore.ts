@@ -214,8 +214,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
       lastModifiedAt: Date.now(),
     };
 
+    // Save locally first
     await saveGameLocal(updatedGame);
 
+    // Update local state immediately for optimistic update
     set(
       produce((draft) => {
         draft.currentGame = updatedGame;
@@ -232,6 +234,31 @@ export const useGameStore = create<GameStore>((set, get) => ({
         }
       }),
     );
+
+    // Sync to server if online (this was missing!)
+    if (navigator.onLine && currentGame.adminToken) {
+      try {
+        const response = await fetch(`/api/game/${currentGame.gameCode}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatedGame),
+        });
+        
+        if (!response.ok) {
+          console.error("[GameStore] Failed to sync game items to server:", response.status);
+        } else {
+          console.log("[GameStore] Game items synced to server successfully");
+          
+          // Trigger immediate poll for other players to get the update
+          const syncManager = getSyncManager();
+          if (syncManager) {
+            syncManager.markActivity(true);
+          }
+        }
+      } catch (error) {
+        console.error("[GameStore] Error syncing game items to server:", error);
+      }
+    }
   },
 
   deleteGame: async (gameId) => {
@@ -782,19 +809,36 @@ export const useGameStore = create<GameStore>((set, get) => ({
     } else {
       // Partial update - need to carefully merge items
       // If latestGame has items, merge them properly instead of replacing
-      if (latestGame.items && currentGame.items) {
-        const mergedItems = currentGame.items.map((currentItem, index) => {
-          const updatedItem = latestGame.items?.[index];
-          if (!updatedItem) return currentItem;
+      if (latestGame.items) {
+        // Use the longer array to ensure we don't lose items
+        const maxLength = Math.max(
+          latestGame.items.length,
+          currentGame.items?.length || 0
+        );
+        
+        const mergedItems = [];
+        for (let i = 0; i < maxLength; i++) {
+          const currentItem = currentGame.items?.[i];
+          const updatedItem = latestGame.items[i];
           
-          // Merge the item, preserving all existing fields
-          return {
-            ...currentItem,
-            ...updatedItem,
-            // Ensure text is always preserved from current if not in update
-            text: updatedItem.text || currentItem.text,
-          };
-        });
+          if (updatedItem) {
+            // If we have an update, merge it with current (if exists)
+            if (currentItem) {
+              mergedItems.push({
+                ...currentItem,
+                ...updatedItem,
+                // Ensure text is always preserved
+                text: updatedItem.text || currentItem.text,
+              });
+            } else {
+              // New item from server
+              mergedItems.push(updatedItem);
+            }
+          } else if (currentItem) {
+            // Keep current item if no update
+            mergedItems.push(currentItem);
+          }
+        }
         gameToMerge = { ...currentGame, ...latestGame, items: mergedItems };
       } else {
         gameToMerge = { ...currentGame, ...latestGame };

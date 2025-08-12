@@ -122,8 +122,8 @@ class SyncManager {
     
     try {
       const params = new URLSearchParams({
-        since: this.pollingState.lastSyncTime.toString(),
-        version: this.pollingState.lastVersion,
+        since: (this.pollingState.lastSyncTime || 0).toString(),
+        version: this.pollingState.lastVersion || "",
       });
       
       const response = await fetch(`/api/game/changes/${this.gameCode}?${params}`, {
@@ -156,6 +156,11 @@ class SyncManager {
    * Handle successful poll response
    */
   private handlePollResponse(data: any) {
+    if (!data) {
+      console.warn("[SyncManager] Received empty poll response");
+      return;
+    }
+    
     const { version, lastModifiedAt, changes, timestamp } = data;
     
     // Update version tracking
@@ -163,25 +168,27 @@ class SyncManager {
       this.pollingState.lastVersion = version;
       this.pollingState.lastSyncTime = lastModifiedAt || timestamp;
       
-      // Process game update
-      if (changes.fullUpdate && changes.game) {
-        console.log("[SyncManager] Full game update received");
-        this.callbacks.onGameUpdate(changes.game);
-        
-        // Check for winner announcement
-        if (changes.game.winner && this.callbacks.onWinnerAnnounced) {
-          this.callbacks.onWinnerAnnounced(changes.game.winner.displayName);
+      // Process game update if we have changes
+      if (changes) {
+        if (changes.fullUpdate && changes.game) {
+          console.log("[SyncManager] Full game update received");
+          this.callbacks.onGameUpdate(changes.game);
+          
+          // Check for winner announcement
+          if (changes.game.winner && this.callbacks.onWinnerAnnounced) {
+            this.callbacks.onWinnerAnnounced(changes.game.winner.displayName);
+          }
+        } else {
+          // Handle incremental update
+          console.log("[SyncManager] Incremental update received");
+          // The store will handle merging the partial data
+          this.callbacks.onGameUpdate({
+            players: changes.players,
+            winner: changes.winner,
+            items: changes.items,
+            lastModifiedAt: lastModifiedAt,
+          } as any);
         }
-      } else {
-        // Handle incremental update
-        console.log("[SyncManager] Incremental update received");
-        // The store will handle merging the partial data
-        this.callbacks.onGameUpdate({
-          players: changes.players,
-          winner: changes.winner,
-          items: changes.items,
-          lastModifiedAt: lastModifiedAt,
-        } as any);
       }
     }
   }
