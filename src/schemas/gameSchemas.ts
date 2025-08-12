@@ -71,7 +71,7 @@ export const GameEventSchema = z.object({
   ]),
   timestamp: z.number().positive(),
   playerId: z.string().uuid().optional(),
-  data: z.any().optional(),
+  data: z.unknown().optional(),
 });
 
 /**

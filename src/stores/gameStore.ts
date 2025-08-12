@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { produce } from "immer";
+import type { WritableDraft } from "immer";
 import type { Game, PlayerState, BingoItem } from "../types/types.ts";
 import {
   loadPlayerState,
@@ -33,7 +34,7 @@ import {
 interface GameStore {
   currentGame: Game | null;
   playerState: PlayerState | null;
-  localGames: readonly {
+  localGames: {
     id: string;
     gameCode: string;
     adminToken?: string;
@@ -90,8 +91,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   createGame: async (title) => {
     const game = await createGame(title);
     set(
-      produce((draft) => {
-        draft.currentGame = game;
+      produce((draft: WritableDraft<GameStore>) => {
+        draft.currentGame = game as WritableDraft<Game>;
         draft.localGames.push({
           id: game.id,
           gameCode: game.gameCode,
@@ -187,10 +188,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const updatedGame = await saveGameItems(currentGame, items);
 
     set(
-      produce((draft: any) => {
-        draft.currentGame = updatedGame;
+      produce((draft: WritableDraft<GameStore>) => {
+        draft.currentGame = updatedGame as WritableDraft<Game>;
         const gameIndex = draft.localGames.findIndex(
-          (g: any) => g.id === updatedGame.id
+          (g) => g.id === updatedGame.id
         );
         if (gameIndex >= 0) {
           draft.localGames[gameIndex] = {
@@ -213,9 +214,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
     await deleteGame(gameId);
 
     set(
-      produce((draft: any) => {
+      produce((draft: WritableDraft<GameStore>) => {
         draft.localGames = draft.localGames.filter(
-          (g: any) => g.id !== gameId
+          (g) => g.id !== gameId
         );
         if (draft.currentGame?.id === gameId) {
           draft.currentGame = null;
@@ -262,33 +263,33 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
 
     set(
-      produce((draft: any) => {
+      produce((draft: WritableDraft<GameStore>) => {
         if (!draft.playerState || !draft.currentGame) return;
 
         draft.optimisticState = { ...draft.playerState };
 
-        const marked = draft.playerState.markedPositions;
+        const marked = draft.playerState.markedPositions as number[];
         const isUnmarking = marked.includes(position);
 
-        draft.playerState.markedPositions = updateMarkedPositions(
+        (draft.playerState.markedPositions as number[]) = updateMarkedPositions(
           marked,
           position,
           isUnmarking
-        );
-        draft.playerState.lastSyncAt = Date.now();
+        ) as number[];
+        (draft.playerState.lastSyncAt as number) = Date.now();
 
-        const itemIndex = draft.currentGame.items.findIndex(
-          (item: any) => item.position === position
+        const itemIndex = (draft.currentGame.items as BingoItem[]).findIndex(
+          (item) => item.position === position
         );
 
         if (itemIndex >= 0) {
           const item = draft.currentGame.items[itemIndex];
-          draft.currentGame.items[itemIndex] = toggleItemMark(
+          (draft.currentGame.items as WritableDraft<BingoItem>[])[itemIndex] = toggleItemMark(
             item,
             currentPlayerId,
             playerState.displayName,
             isUnmarking
-          );
+          ) as WritableDraft<BingoItem>;
         }
       })
     );
@@ -300,7 +301,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         saveGameLocal(updatedState.currentGame),
       ]).catch(() => {
         set(
-          produce((draft) => {
+          produce((draft: WritableDraft<GameStore>) => {
             if (draft.optimisticState) {
               draft.playerState = draft.optimisticState;
               draft.optimisticState = null;
@@ -315,7 +316,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   clearMarkedPositions: () => {
     set(
-      produce((draft) => {
+      produce((draft: WritableDraft<GameStore>) => {
         if (!draft.playerState) return;
         draft.playerState.markedPositions = [];
         draft.playerState.lastSyncAt = Date.now();
@@ -376,11 +377,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
       if (result.nearMiss) {
         set(
-          produce((draft) => {
-            draft.nearMissInfo = {
-              ...result.nearMiss,
-              showNotification: true,
-            };
+          produce((draft: WritableDraft<GameStore>) => {
+            if (result.nearMiss) {
+              draft.nearMissInfo = {
+                winnerName: result.nearMiss.winnerName || '',
+                timeDifference: result.nearMiss.timeDifference || 0,
+                showNotification: true,
+              };
+            }
           })
         );
       }
@@ -473,7 +477,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (mergedGame.winner && !currentGame.winner) {
       if (mergedGame.winner.playerId === currentPlayerId) {
         set(
-          produce((draft) => {
+          produce((draft: WritableDraft<GameStore>) => {
             draft.nearMissInfo = null;
           })
         );
@@ -486,7 +490,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           const timeDiff = Date.now() - mergedGame.winner.wonAt;
           if (timeDiff < TIMEOUTS.NEAR_MISS_WINDOW) {
             set(
-              produce((draft) => {
+              produce((draft: WritableDraft<GameStore>) => {
                 draft.nearMissInfo = {
                   winnerName: mergedGame.winner!.displayName,
                   timeDifference: timeDiff,
@@ -532,7 +536,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       !playerState.hasWon
     ) {
       set(
-        produce((draft) => {
+        produce((draft: WritableDraft<GameStore>) => {
           if (draft.playerState) {
             draft.playerState.hasWon = true;
           }

@@ -10,10 +10,10 @@ export function safeValidate<T>(
   try {
     const validData = schema.parse(data);
     return { success: true, data: validData };
-  } catch (error: any) {
+  } catch (error) {
     if (error instanceof z.ZodError) {
       const errorMessages = error.issues
-        .map((e: any) => `${e.path?.join(".") || "root"}: ${e.message}`)
+        .map((e) => `${e.path?.join(".") || "root"}: ${e.message}`)
         .join(", ");
       return { success: false, error: errorMessages };
     }
@@ -24,12 +24,12 @@ export function safeValidate<T>(
 /**
  * Partial validation for updates (makes all fields optional)
  */
-export function validatePartial<T>(
-  schema: z.ZodObject<any>,
+export function validatePartial<T extends z.ZodRawShape>(
+  schema: z.ZodObject<T>,
   data: unknown
-): { success: true; data: Partial<T> } | { success: false; error: string } {
+) {
   const partialSchema = schema.partial();
-  return safeValidate(partialSchema as z.ZodSchema<Partial<T>>, data);
+  return safeValidate(partialSchema, data);
 }
 
 /**

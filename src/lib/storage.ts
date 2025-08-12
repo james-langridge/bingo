@@ -1,5 +1,5 @@
 import Dexie, { type Table } from "dexie";
-import type { Game, PlayerState, GameEvent } from "../types/types.ts";
+import type { Game, PlayerState, GameEvent, Player } from "../types/types.ts";
 import { STORAGE, TIMEOUTS } from "./constants";
 import { GameSchema, PlayerStateSchema } from "../schemas/gameSchemas";
 import { safeValidate } from "../schemas/validation";
@@ -124,7 +124,7 @@ export async function loadGameByCode(
           mergedGame = { ...serverGame, adminToken: localGame.adminToken };
         }
         
-        const playerMap = new Map<string, any>();
+        const playerMap = new Map<string, Player>();
         
         serverGame.players?.forEach(player => {
           playerMap.set(player.displayName, player);

@@ -40,8 +40,8 @@ function ThrowErrorFunctional({ shouldThrow }: { shouldThrow: boolean }) {
 }
 
 describe("ErrorBoundary", () => {
-  let consoleErrorSpy: any;
-  let consoleGroupSpy: any;
+  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+  let consoleGroupSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     // Suppress console errors during tests
@@ -54,12 +54,14 @@ describe("ErrorBoundary", () => {
     sessionStorage.clear();
     
     // Mock window.location
-    delete (window as any).location;
-    (window as any).location = { 
-      href: "http://localhost:3000/game/ABC123",
-      pathname: "/game/ABC123",
-      reload: vi.fn(),
-    };
+    Object.defineProperty(window, 'location', {
+      value: { 
+        href: "http://localhost:3000/game/ABC123",
+        pathname: "/game/ABC123",
+        reload: vi.fn(),
+      },
+      writable: true,
+    });
   });
 
   afterEach(() => {

@@ -1,4 +1,4 @@
-import type { Game, PlayerState } from "../types/types";
+import type { Game, PlayerState, Player, WinnerInfo, BingoItem } from "../types/types";
 import { POLLING } from "./constants";
 
 /**
@@ -139,16 +139,29 @@ class SyncManager {
   /**
    * Handle successful poll response
    */
-  private handlePollResponse(data: any) {
-    if (!data) {
+  private handlePollResponse(data: unknown) {
+    if (!data || typeof data !== 'object') {
       return;
     }
     
-    const { version, lastModifiedAt, changes, timestamp } = data;
+    const response = data as {
+      version?: string;
+      lastModifiedAt?: number;
+      timestamp?: number;
+      changes?: {
+        fullUpdate?: boolean;
+        game?: Game;
+        players?: readonly Player[];
+        winner?: WinnerInfo;
+        items?: readonly BingoItem[];
+      };
+    };
     
-    if (version !== this.pollingState.lastVersion) {
+    const { version, lastModifiedAt, changes, timestamp } = response;
+    
+    if (version && version !== this.pollingState.lastVersion) {
       this.pollingState.lastVersion = version;
-      this.pollingState.lastSyncTime = lastModifiedAt || timestamp;
+      this.pollingState.lastSyncTime = lastModifiedAt || timestamp || Date.now();
       
       if (changes) {
         if (changes.fullUpdate && changes.game) {
@@ -163,7 +176,7 @@ class SyncManager {
             winner: changes.winner,
             items: changes.items,
             lastModifiedAt: lastModifiedAt,
-          } as any);
+          } as Game);
         }
       }
     }
@@ -186,7 +199,7 @@ class SyncManager {
   /**
    * Handle polling error
    */
-  private handlePollError(_error: any) {
+  private handlePollError(_error: unknown) {
     this.pollingState.consecutiveErrors++;
     
     if (this.pollingState.consecutiveErrors >= 3 && this.isConnected) {
@@ -347,7 +360,7 @@ export function mergeGameStates(local: Game, remote: Game): Game {
     };
   });
 
-  const playerMap = new Map<string, any>();
+  const playerMap = new Map<string, Player>();
   
   remote.players?.forEach(player => {
     playerMap.set(player.displayName, player);

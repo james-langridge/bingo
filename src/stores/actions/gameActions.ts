@@ -39,7 +39,7 @@ export async function loadGame(gameCode: string): Promise<Game | undefined> {
 /**
  * Update game items and save
  */
-export async function saveGameItems(game: Game, items: any[]): Promise<Game> {
+export async function saveGameItems(game: Game, items: unknown[]): Promise<Game> {
   const itemsValidation = safeValidate(BingoItemSchema.array(), items);
   if (!itemsValidation.success) {
     throw new Error(`Invalid items: ${itemsValidation.error}`);
