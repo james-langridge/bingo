@@ -373,6 +373,22 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { currentGame, currentPlayerId, playerState } = get();
     if (!currentGame || !playerState || !currentPlayerId) return;
 
+    // Check if player has won - if so, don't allow more marking
+    if (playerState.hasWon || currentGame.winner) {
+      console.log("[GameStore] Game already won, ignoring mark");
+      return;
+    }
+
+    const totalSquares = currentGame.settings ? currentGame.settings.gridSize * currentGame.settings.gridSize : 0;
+    console.log("[GameStore] Marking position:", {
+      position,
+      currentMarkedCount: playerState.markedPositions.length,
+      totalSquares,
+      gridSize: currentGame.settings?.gridSize,
+      willBeComplete: !playerState.markedPositions.includes(position) && 
+                      playerState.markedPositions.length + 1 === totalSquares,
+    });
+
     // Mark activity for immediate polling
     const syncManager = getSyncManager();
     if (syncManager) {
@@ -534,6 +550,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       return;
     }
 
+    const totalSquares = currentGame.settings ? currentGame.settings.gridSize * currentGame.settings.gridSize : 0;
     const hasWon = currentGame.settings ? checkWinCondition(
       playerState.markedPositions,
       currentGame.settings.gridSize,
@@ -542,8 +559,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
     console.log("[Multiplayer] Checking for win:", {
       hasWon,
       markedPositions: playerState.markedPositions,
+      markedCount: playerState.markedPositions.length,
+      totalSquares,
       gridSize: currentGame.settings?.gridSize,
       requireFullCard: currentGame.settings?.requireFullCard,
+      winConditionMet: playerState.markedPositions.length === totalSquares,
     });
 
     if (hasWon) {
