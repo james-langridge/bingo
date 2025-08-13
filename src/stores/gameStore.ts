@@ -411,43 +411,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { currentGame, currentPlayerId, playerState } = get();
     if (!currentGame) return;
 
-    let gameToMerge: Game;
-
-    if (latestGame.settings) {
-      gameToMerge = latestGame;
-    } else {
-      if (latestGame.items) {
-        const maxLength = Math.max(
-          latestGame.items.length,
-          currentGame.items?.length || 0,
-        );
-
-        const mergedItems = [];
-        for (let i = 0; i < maxLength; i++) {
-          const currentItem = currentGame.items?.[i];
-          const updatedItem = latestGame.items[i];
-
-          if (updatedItem) {
-            if (currentItem) {
-              mergedItems.push({
-                ...currentItem,
-                ...updatedItem,
-                text: updatedItem.text || currentItem.text,
-              });
-            } else {
-              mergedItems.push(updatedItem);
-            }
-          } else if (currentItem) {
-            mergedItems.push(currentItem);
-          }
-        }
-        gameToMerge = { ...currentGame, ...latestGame, items: mergedItems };
-      } else {
-        gameToMerge = { ...currentGame, ...latestGame };
-      }
-    }
-
-    const mergedGame = mergeGameStates(currentGame, gameToMerge);
+    // Always use mergeGameStates for proper markedBy merging
+    const mergedGame = mergeGameStates(currentGame, latestGame);
 
     if (mergedGame.winner && !currentGame.winner) {
     }

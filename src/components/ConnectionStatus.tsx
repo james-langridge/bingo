@@ -10,12 +10,14 @@ export function ConnectionStatus() {
   // Update time since last sync
   useEffect(() => {
     const updateTimeSinceSync = () => {
-      if (!playerState?.lastSyncAt) {
+      if (!currentGame?.lastModifiedAt) {
         setTimeSinceSync("");
         return;
       }
 
-      const seconds = Math.floor((Date.now() - playerState.lastSyncAt) / 1000);
+      const seconds = Math.floor(
+        (Date.now() - currentGame.lastModifiedAt) / 1000,
+      );
       if (seconds < 60) {
         setTimeSinceSync(`${seconds}s ago`);
       } else {
@@ -27,7 +29,7 @@ export function ConnectionStatus() {
     updateTimeSinceSync();
     const interval = setInterval(updateTimeSinceSync, 1000);
     return () => clearInterval(interval);
-  }, [playerState?.lastSyncAt]);
+  }, [currentGame?.lastModifiedAt]);
 
   useEffect(() => {
     let timeout: number;
@@ -44,10 +46,15 @@ export function ConnectionStatus() {
     return () => clearTimeout(timeout);
   }, [isConnected]);
 
-  // Don't show if no game is loaded or game has never been synced
+  // Only show sync status if:
+  // 1. Player has joined the game (has playerState)
+  // 2. Game has been started (has items)
+  // 3. Game has been synced at least once (has lastModifiedAt)
   if (
     !currentGame ||
-    (!playerState?.lastSyncAt && currentGame.items.length === 0)
+    !playerState ||
+    currentGame.items.length === 0 ||
+    !currentGame.lastModifiedAt
   ) {
     return null;
   }

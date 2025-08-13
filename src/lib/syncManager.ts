@@ -174,17 +174,24 @@ class SyncManager {
 
       if (changes) {
         if (changes.fullUpdate && changes.game) {
-          this.callbacks.onGameUpdate(changes.game);
+          // Ensure lastModifiedAt is set on full updates
+          const gameWithTimestamp = {
+            ...changes.game,
+            lastModifiedAt:
+              lastModifiedAt || changes.game.lastModifiedAt || Date.now(),
+          };
+          this.callbacks.onGameUpdate(gameWithTimestamp);
 
           if (changes.game.winner && this.callbacks.onWinnerAnnounced) {
             this.callbacks.onWinnerAnnounced(changes.game.winner.displayName);
           }
         } else {
+          // Partial update with specific fields
           this.callbacks.onGameUpdate({
             players: changes.players,
             winner: changes.winner,
             items: changes.items,
-            lastModifiedAt: lastModifiedAt,
+            lastModifiedAt: lastModifiedAt || Date.now(),
           } as Game);
         }
       }
@@ -339,40 +346,47 @@ export function resetSyncManager() {
  */
 
 export function mergeGameStates(local: Game, remote: Game): Game {
-  const merged: Game = {
-    ...remote,
-    adminToken: local.adminToken || remote.adminToken,
-  };
+  // Handle partial updates where remote might not have all fields
+  let mergedItems = local.items || [];
 
-  const mergedItems = remote.items.map((remoteItem, index) => {
-    const localItem = local.items[index];
+  // If remote has items, merge them properly
+  if (remote.items && remote.items.length > 0) {
+    mergedItems = remote.items.map((remoteItem, index) => {
+      const localItem = local.items?.[index];
 
-    const baseItem = localItem || remoteItem;
-
-    const markedByMap = new Map();
-
-    remoteItem.markedBy?.forEach((mark) => {
-      markedByMap.set(mark.playerId, mark);
-    });
-
-    localItem?.markedBy?.forEach((mark) => {
-      const existing = markedByMap.get(mark.playerId);
-      if (!existing || mark.markedAt > existing.markedAt) {
-        markedByMap.set(mark.playerId, mark);
+      // If no local item exists, use remote
+      if (!localItem) {
+        return remoteItem;
       }
-    });
 
-    return {
-      ...baseItem,
-      ...remoteItem,
-      text: remoteItem.text || baseItem.text,
-      position: remoteItem.position ?? baseItem.position,
-      id: remoteItem.id || baseItem.id,
-      markedBy: Array.from(markedByMap.values()).sort(
-        (a, b) => a.markedAt - b.markedAt,
-      ),
-    };
-  });
+      // Merge markedBy arrays
+      const markedByMap = new Map();
+
+      // Add remote marks first
+      remoteItem.markedBy?.forEach((mark) => {
+        markedByMap.set(mark.playerId, mark);
+      });
+
+      // Add local marks, keeping newer ones
+      localItem.markedBy?.forEach((mark) => {
+        const existing = markedByMap.get(mark.playerId);
+        if (!existing || mark.markedAt > existing.markedAt) {
+          markedByMap.set(mark.playerId, mark);
+        }
+      });
+
+      return {
+        ...localItem,
+        ...remoteItem,
+        text: remoteItem.text || localItem.text,
+        position: remoteItem.position ?? localItem.position,
+        id: remoteItem.id || localItem.id,
+        markedBy: Array.from(markedByMap.values()).sort(
+          (a, b) => a.markedAt - b.markedAt,
+        ),
+      };
+    });
+  }
 
   const playerMap = new Map<string, Player>();
 
@@ -394,7 +408,9 @@ export function mergeGameStates(local: Game, remote: Game): Game {
   });
 
   return {
-    ...merged,
+    ...local,
+    ...remote,
+    adminToken: local.adminToken || remote.adminToken,
     items: mergedItems,
     players: Array.from(playerMap.values()),
     winner: remote.winner,
