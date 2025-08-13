@@ -6,6 +6,18 @@ const redis = new Redis({
   token: process.env.KV_REST_API_TOKEN!,
 });
 
+// Vercel function timeout limits
+const FUNCTION_TIMEOUT = {
+  HOBBY: 9000, // 9 seconds (leaving 1s buffer before 10s limit)
+  PRO: 295000, // 4m 55s (leaving 5s buffer before 5min limit)
+};
+
+// Use Pro timeout if available, otherwise Hobby
+const MAX_RUNTIME =
+  process.env.VERCEL_ENV === "production"
+    ? FUNCTION_TIMEOUT.PRO
+    : FUNCTION_TIMEOUT.HOBBY;
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Only allow GET requests
   if (req.method !== "GET") {
@@ -27,18 +39,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     "X-Accel-Buffering": "no", // Disable Nginx buffering
   });
 
-  // Track last sent data to avoid duplicate sends
+  // Track timing and state
+  const startTime = Date.now();
   let lastGameData: string | null = null;
   let lastOnlineCount = 0;
+  let pollCount = 0;
+
+  // Adaptive polling intervals based on activity
+  let pollInterval = 500; // Start with 500ms for immediate responsiveness
+  let noChangeCount = 0;
 
   // Function to check and send updates
   const checkForUpdates = async () => {
     try {
+      pollCount++;
       const gameData = await redis.get(`game:${code}`);
 
       if (!gameData) {
         res.write(`data: {"error":"Game not found"}\n\n`);
-        return;
+        return false; // Signal to stop polling
       }
 
       const game =
@@ -56,10 +75,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         onlineCount,
       });
 
-      // Only send if data changed
+      // Check if data changed
       if (currentData !== lastGameData) {
         res.write(`data: ${currentData}\n\n`);
         lastGameData = currentData;
+        noChangeCount = 0; // Reset no-change counter
+        pollInterval = 500; // Return to fast polling when changes detected
 
         // Log player count changes for debugging
         if (onlineCount !== lastOnlineCount) {
@@ -68,32 +89,81 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           );
           lastOnlineCount = onlineCount;
         }
+      } else {
+        noChangeCount++;
+
+        // Adaptive polling: slow down if no changes
+        if (noChangeCount > 10 && pollInterval < 2000) {
+          pollInterval = 1000; // After 5 seconds of no changes, slow to 1s
+        } else if (noChangeCount > 30 && pollInterval < 3000) {
+          pollInterval = 2000; // After 30 seconds of no changes, slow to 2s
+        } else if (noChangeCount > 60) {
+          pollInterval = 3000; // After 1 minute of no changes, slow to 3s max
+        }
       }
+
+      return true; // Continue polling
     } catch (error) {
       console.error(`[SSE] Error checking updates for game ${code}:`, error);
+      return true; // Continue despite errors
     }
   };
 
   // Send initial state immediately
-  await checkForUpdates();
+  const shouldContinue = await checkForUpdates();
+  if (!shouldContinue) {
+    res.end();
+    return;
+  }
 
-  // Poll for changes every 500ms
-  const pollInterval = setInterval(checkForUpdates, 500);
+  // Dynamic polling with timeout awareness
+  const poll = async () => {
+    const elapsed = Date.now() - startTime;
+    const remaining = MAX_RUNTIME - elapsed;
 
-  // Send heartbeat every 30 seconds to keep connection alive
+    // Stop polling 2 seconds before timeout to gracefully close
+    if (remaining < 2000) {
+      console.log(
+        `[SSE] Closing connection for game ${code} before timeout. ` +
+          `Polls: ${pollCount}, Runtime: ${elapsed}ms`,
+      );
+
+      // Send a reconnect hint to the client
+      res.write(`event: timeout\ndata: {"reconnect": true}\n\n`);
+      res.end();
+      return;
+    }
+
+    // Check for updates
+    const shouldContinue = await checkForUpdates();
+    if (!shouldContinue) {
+      res.end();
+      return;
+    }
+
+    // Schedule next poll with adaptive interval
+    setTimeout(poll, pollInterval);
+  };
+
+  // Start polling after initial state
+  setTimeout(poll, pollInterval);
+
+  // Send periodic heartbeats (every 30 seconds)
   const heartbeatInterval = setInterval(() => {
-    res.write(":heartbeat\n\n");
+    const elapsed = Date.now() - startTime;
+    if (elapsed < MAX_RUNTIME - 2000) {
+      res.write(`:heartbeat\n\n`);
+    }
   }, 30000);
 
   // Cleanup on client disconnect
   req.on("close", () => {
-    clearInterval(pollInterval);
     clearInterval(heartbeatInterval);
-    console.log(`[SSE] Client disconnected from game ${code}`);
+    const elapsed = Date.now() - startTime;
+    console.log(
+      `[SSE] Client disconnected from game ${code}. ` +
+        `Polls: ${pollCount}, Runtime: ${elapsed}ms, Avg interval: ${Math.round(elapsed / pollCount)}ms`,
+    );
     res.end();
   });
-
-  // Keep connection open
-  // Note: Vercel has a 10 second timeout on hobby plan, 5 minutes on pro
-  // The connection will auto-reconnect when it times out
 }
