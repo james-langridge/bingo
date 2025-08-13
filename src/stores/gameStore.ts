@@ -140,6 +140,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
       });
       syncManager.connect(gameCode);
 
+      // Update initial player count
+      if (game.players) {
+        syncManager.updateActivePlayerCount(game.players);
+      }
+
       if (playerState) {
         get().startPolling();
       }
@@ -234,6 +239,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
       onWinnerAnnounced: () => {},
     });
     syncManager.connect(gameCode);
+
+    // Update initial player count after joining
+    if (game.players) {
+      syncManager.updateActivePlayerCount(game.players);
+    }
 
     get().startPolling();
   },
@@ -442,6 +452,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
       currentGame: updatedGame,
       lastServerState: updatedGame,
     });
+
+    // Update sync manager with new player count
+    const syncManager = getSyncManager();
+    if (syncManager) {
+      syncManager.updateActivePlayerCount(updatedPlayers);
+    }
 
     if (
       mergedGame.winner &&

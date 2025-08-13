@@ -5,7 +5,7 @@ import type {
   WinnerInfo,
   BingoItem,
 } from "../types/types";
-import { POLLING } from "./constants";
+import { POLLING, TIMEOUTS } from "./constants";
 
 /**
  * SyncManager handles real-time synchronization of game state
@@ -29,6 +29,7 @@ interface PollingState {
   lastSyncTime: number;
   lastVersion: string;
   consecutiveErrors: number;
+  activePlayerCount: number;
 }
 
 class SyncManager {
@@ -42,6 +43,7 @@ class SyncManager {
     lastSyncTime: 0,
     lastVersion: "",
     consecutiveErrors: 0,
+    activePlayerCount: 0,
   };
 
   private visibilityHandler: (() => void) | null = null;
@@ -82,7 +84,7 @@ class SyncManager {
   }
 
   /**
-   * Calculate the appropriate polling interval based on activity
+   * Calculate the appropriate polling interval based on activity and online players
    */
   private calculateInterval(): number {
     const now = Date.now();
@@ -92,6 +94,12 @@ class SyncManager {
       return POLLING.INACTIVE;
     }
 
+    // If multiple players are online, always use active polling
+    if (this.pollingState.activePlayerCount > 1) {
+      return POLLING.ACTIVE;
+    }
+
+    // Single player: use activity-based intervals
     if (timeSinceActivity < POLLING.IDLE_THRESHOLD) {
       return POLLING.ACTIVE;
     }
@@ -166,6 +174,21 @@ class SyncManager {
     };
 
     const { version, lastModifiedAt, changes, timestamp } = response;
+
+    // Update active player count
+    if (changes?.players) {
+      const now = Date.now();
+      const activePlayers = changes.players.filter(
+        (p) => now - (p.lastSeenAt || 0) < TIMEOUTS.ONLINE_THRESHOLD,
+      );
+      this.pollingState.activePlayerCount = activePlayers.length;
+    } else if (changes?.fullUpdate && changes.game?.players) {
+      const now = Date.now();
+      const activePlayers = changes.game.players.filter(
+        (p) => now - (p.lastSeenAt || 0) < TIMEOUTS.ONLINE_THRESHOLD,
+      );
+      this.pollingState.activePlayerCount = activePlayers.length;
+    }
 
     if (version && version !== this.pollingState.lastVersion) {
       this.pollingState.lastVersion = version;
@@ -310,6 +333,23 @@ class SyncManager {
     if (this.gameCode) {
       this.pollingState.consecutiveErrors = 0;
       this.startPolling();
+    }
+  }
+
+  /**
+   * Update the active player count (called from store when game state changes)
+   */
+  updateActivePlayerCount(players: readonly Player[]) {
+    const now = Date.now();
+    const activePlayers = players.filter(
+      (p) => now - (p.lastSeenAt || 0) < TIMEOUTS.ONLINE_THRESHOLD,
+    );
+    const previousCount = this.pollingState.activePlayerCount;
+    this.pollingState.activePlayerCount = activePlayers.length;
+
+    // If player count increased and we were in slow polling, speed up
+    if (activePlayers.length > previousCount && activePlayers.length > 1) {
+      this.markActivity(true);
     }
   }
 
