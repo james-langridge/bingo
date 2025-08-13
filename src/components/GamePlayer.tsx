@@ -68,6 +68,36 @@ export function GamePlayer() {
     }
   }, [currentGame?.winner, playerState?.displayName]);
 
+  // Send heartbeat to keep player marked as online
+  useEffect(() => {
+    if (!currentGame || !playerState || !currentPlayerId) return;
+
+    const sendHeartbeat = async () => {
+      try {
+        // Send heartbeat to dedicated endpoint
+        await fetch(`/api/player/${currentGame.gameCode}/heartbeat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ playerId: currentPlayerId }),
+        });
+
+        console.log("[GamePlayer] Sent heartbeat to keep player online");
+      } catch (error) {
+        console.error("[GamePlayer] Failed to send heartbeat:", error);
+      }
+    };
+
+    // Send initial heartbeat
+    sendHeartbeat();
+
+    // Send heartbeat every 10 seconds (well under the 15 second timeout)
+    const interval = setInterval(sendHeartbeat, 10000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [currentGame?.gameCode, currentPlayerId]);
+
   // Cleanup SSE connection when leaving the game page
   useEffect(() => {
     return () => {
@@ -141,25 +171,31 @@ export function GamePlayer() {
                   Players already in this game ({currentGame.players.length}):
                 </h3>
                 <div className="space-y-1">
-                  {currentGame.players.map((player) => (
-                    <div
-                      key={player.id}
-                      className="text-sm text-gray-600 flex items-center"
-                    >
-                      • {player.displayName}
-                      {player.hasWon && (
-                        <span className="ml-2 text-green-600 font-semibold">
-                          🏆 Winner!
-                        </span>
-                      )}
-                      {player.isOnline && (
-                        <span
-                          className="ml-2 w-2 h-2 bg-green-500 rounded-full inline-block"
-                          title="Online now"
-                        />
-                      )}
-                    </div>
-                  ))}
+                  {currentGame.players.map((player) => {
+                    // Calculate if player is online (lastSeenAt within 15 seconds)
+                    const isOnline =
+                      Date.now() - (player.lastSeenAt || 0) < 15000;
+
+                    return (
+                      <div
+                        key={player.id}
+                        className="text-sm text-gray-600 flex items-center"
+                      >
+                        • {player.displayName}
+                        {player.hasWon && (
+                          <span className="ml-2 text-green-600 font-semibold">
+                            🏆 Winner!
+                          </span>
+                        )}
+                        {isOnline && (
+                          <span
+                            className="ml-2 w-2 h-2 bg-green-500 rounded-full inline-block"
+                            title="Online now"
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
                   Tip: If you played before, use the same name to continue your
@@ -259,27 +295,32 @@ export function GamePlayer() {
               </h3>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-              {currentGame.players.map((player) => (
-                <div
-                  key={player.id}
-                  className={`text-sm px-2 py-1 rounded ${
-                    player.displayName === playerState?.displayName
-                      ? "bg-blue-100 text-blue-700 font-semibold"
-                      : "bg-white text-gray-600"
-                  } ${player.hasWon ? "border-2 border-green-500" : ""}`}
-                >
-                  <div className="flex items-center">
-                    {player.hasWon && <span className="mr-1">🏆</span>}
-                    {player.isOnline && (
-                      <span
-                        className="w-2 h-2 bg-green-500 rounded-full mr-1"
-                        title="Online now"
-                      />
-                    )}
-                    <span className="truncate">{player.displayName}</span>
+              {currentGame.players.map((player) => {
+                // Calculate if player is online (lastSeenAt within 15 seconds)
+                const isOnline = Date.now() - (player.lastSeenAt || 0) < 15000;
+
+                return (
+                  <div
+                    key={player.id}
+                    className={`text-sm px-2 py-1 rounded ${
+                      player.displayName === playerState?.displayName
+                        ? "bg-blue-100 text-blue-700 font-semibold"
+                        : "bg-white text-gray-600"
+                    } ${player.hasWon ? "border-2 border-green-500" : ""}`}
+                  >
+                    <div className="flex items-center">
+                      {player.hasWon && <span className="mr-1">🏆</span>}
+                      {isOnline && (
+                        <span
+                          className="w-2 h-2 bg-green-500 rounded-full mr-1"
+                          title="Online now"
+                        />
+                      )}
+                      <span className="truncate">{player.displayName}</span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
