@@ -57,50 +57,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // Intelligent polling based on player count
       if (onlineCount <= 1) {
-        // 0 or 1 players: Check for wake-up signal
-        pollInterval = 0;
+        // 0 or 1 players: Close the connection to save resources
+        console.log(
+          `[SSE] Game ${code}: ${onlineCount} players online - closing connection`,
+        );
 
-        // Check if there's been a recent join event (wake-up signal)
-        const wakeupSignal = await redis.get(`game:${code}:wakeup`);
-        const wakeupTime = wakeupSignal ? Number(wakeupSignal) : 0;
-        const timeSinceWakeup = now - wakeupTime;
+        // Send a final message to let client know why we're closing
+        res.write(
+          `data: {"status":"idle","onlineCount":${onlineCount},"message":"Waiting for more players"}\n\n`,
+        );
 
-        // If there was a recent wake-up (within 2 seconds), start polling temporarily
-        if (wakeupTime > lastWakeupCheck && timeSinceWakeup < 2000) {
-          console.log(
-            `[SSE] Game ${code}: Wake-up signal detected, resuming polling`,
-          );
-          lastWakeupCheck = wakeupTime;
-          pollInterval = 500; // Resume fast polling temporarily
+        // Clean up and close the connection
+        if (pollTimer) {
+          clearTimeout(pollTimer);
         }
+        clearInterval(heartbeatInterval);
+        res.end();
 
-        // Still send the update if data changed
-        const currentData = JSON.stringify({
-          ...game,
-          onlineCount,
-        });
-
-        if (currentData !== lastGameData) {
-          res.write(`data: ${currentData}\n\n`);
-          lastGameData = currentData;
-
-          if (onlineCount !== lastOnlineCount) {
-            console.log(
-              `[SSE] Game ${code}: ${onlineCount} players online - ${pollInterval > 0 ? "active" : "paused"}`,
-            );
-            lastOnlineCount = onlineCount;
-          }
-        }
-
-        // Schedule next check based on whether we're in wake-up mode
-        if (pollInterval > 0) {
-          // We're in wake-up mode, poll quickly for a bit
-          pollTimer = setTimeout(() => checkForUpdates(), 500);
-        } else {
-          // No activity, check less frequently for wake-up signals
-          pollTimer = setTimeout(() => checkForUpdates(), 10000); // Check every 10 seconds
-        }
-        return true;
+        console.log(
+          `[SSE] Game ${code}: Connection closed. Total polls: ${pollCount}`,
+        );
+        return false; // Signal that we've closed
       } else {
         // 2+ players: Need real-time sync
         pollInterval = 500; // Fast polling for active games
