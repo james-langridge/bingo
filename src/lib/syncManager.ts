@@ -11,6 +11,8 @@ class SyncManager {
   private onConnectionChange: ((connected: boolean) => void) | null = null;
   private reconnectAttempts = 0;
   private isConnected = false;
+  private visibilityHandler: (() => void) | null = null;
+  private wasConnectedBeforeHidden = false;
 
   connect(
     gameCode: string,
@@ -25,6 +27,46 @@ class SyncManager {
     this.onUpdate = callbacks.onGameUpdate;
     this.onConnectionChange = callbacks.onConnectionChange;
     this.reconnectAttempts = 0;
+
+    // Set up visibility change handler
+    this.visibilityHandler = () => {
+      if (document.hidden) {
+        // Tab is hidden - pause SSE
+        console.log(
+          `[SyncManager] Tab hidden - pausing SSE for game ${gameCode}`,
+        );
+        this.wasConnectedBeforeHidden = this.isConnected;
+        this.pauseConnection();
+      } else {
+        // Tab is visible - resume SSE if we were connected before
+        console.log(
+          `[SyncManager] Tab visible - resuming SSE for game ${gameCode}`,
+        );
+        if (this.wasConnectedBeforeHidden || !this.eventSource) {
+          this.resumeConnection();
+        }
+      }
+    };
+
+    // Listen for visibility changes
+    document.addEventListener("visibilitychange", this.visibilityHandler);
+
+    // Only connect if tab is visible
+    if (!document.hidden) {
+      this.createConnection();
+    } else {
+      console.log(
+        `[SyncManager] Tab is hidden - delaying connection for game ${gameCode}`,
+      );
+      this.wasConnectedBeforeHidden = true; // Mark that we should connect when visible
+    }
+  }
+
+  private createConnection() {
+    if (this.eventSource) return; // Already connected
+
+    const gameCode = this.gameCode;
+    if (!gameCode) return;
 
     console.log(`[SyncManager] Connecting to game ${gameCode} via SSE`);
 
@@ -90,7 +132,35 @@ class SyncManager {
     };
   }
 
+  private pauseConnection() {
+    if (this.eventSource) {
+      console.log(
+        `[SyncManager] Pausing SSE connection for game ${this.gameCode}`,
+      );
+      this.eventSource.close();
+      this.eventSource = null;
+
+      // Don't update connection status - we're just paused
+      // The UI should still show as "connected" conceptually
+    }
+  }
+
+  private resumeConnection() {
+    if (!this.eventSource && this.gameCode) {
+      console.log(
+        `[SyncManager] Resuming SSE connection for game ${this.gameCode}`,
+      );
+      this.createConnection();
+    }
+  }
+
   disconnect() {
+    // Clean up visibility handler
+    if (this.visibilityHandler) {
+      document.removeEventListener("visibilitychange", this.visibilityHandler);
+      this.visibilityHandler = null;
+    }
+
     if (this.eventSource) {
       console.log(`[SyncManager] Disconnecting from game ${this.gameCode}`);
       this.eventSource.close();
@@ -102,6 +172,8 @@ class SyncManager {
         this.onConnectionChange?.(false);
       }
     }
+
+    this.wasConnectedBeforeHidden = false;
   }
 
   // Simple activity marking - just for triggering immediate updates
