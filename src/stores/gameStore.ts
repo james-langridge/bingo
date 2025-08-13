@@ -306,10 +306,25 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { currentGame, currentPlayerId, playerState } = get();
     if (!currentGame) return;
 
-    // Just use the server's version directly
-    // Preserve adminToken if we have it locally
+    // Preserve local markedBy data for items since it's client-side only
+    const itemsWithPreservedMarks = latestGame.items.map((serverItem) => {
+      const localItem = currentGame.items.find(
+        (item) => item.id === serverItem.id,
+      );
+      if (localItem?.markedBy && localItem.markedBy.length > 0) {
+        // Keep the local markedBy data
+        return {
+          ...serverItem,
+          markedBy: localItem.markedBy,
+        };
+      }
+      return serverItem;
+    });
+
+    // Use the server's version but preserve local client-side data
     const updatedGame: Game = {
       ...latestGame,
+      items: itemsWithPreservedMarks,
       ...(currentGame.adminToken ? { adminToken: currentGame.adminToken } : {}),
     };
 
