@@ -5,7 +5,6 @@ import {
   createWinnerInfo,
 } from "../calculations/winValidation";
 import { markPlayerAsWinner } from "../calculations/gameCalculations";
-import { getSyncManager } from "../../lib/syncManager";
 
 interface WinClaimResult {
   accepted: boolean;
@@ -43,11 +42,6 @@ export async function claimWin(
   playerState: PlayerState,
   playerId: string,
 ): Promise<WinClaimResult> {
-  const syncManager = getSyncManager();
-  if (syncManager) {
-    syncManager.markActivity();
-  }
-
   let latestGame: Game | null = null;
   if (navigator.onLine) {
     try {

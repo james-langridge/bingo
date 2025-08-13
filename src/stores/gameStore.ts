@@ -3,8 +3,7 @@ import { produce } from "immer";
 import type { WritableDraft } from "immer";
 import type { Game, PlayerState, BingoItem } from "../types/types.ts";
 import { loadPlayerState, saveGameLocal } from "../lib/storage";
-import { getSyncManager, resetSyncManager } from "../lib/syncManager";
-import { TIMEOUTS } from "../lib/constants";
+import { getSyncManager } from "../lib/syncManager";
 
 import {
   createGame,
@@ -15,7 +14,6 @@ import {
 } from "./actions/gameActions";
 import {
   joinGame as joinGameAction,
-  updatePlayerActivity as updateActivity,
   persistPlayerState,
 } from "./actions/playerActions";
 import { checkForWinner, claimWin } from "./actions/winActions";
@@ -34,12 +32,8 @@ interface GameStore {
     title: string;
   }[];
   isLoading: boolean;
-  pollingInterval: number | null;
   currentPlayerId: string | null;
   isConnected: boolean;
-  optimisticState: PlayerState | null;
-  lastServerState: Game | null;
-  optimisticWinClaim: boolean;
 
   createGame: (title: string) => Promise<Game>;
   loadGame: (gameCode: string) => Promise<void>;
@@ -51,12 +45,8 @@ interface GameStore {
   markPosition: (position: number) => void;
   clearMarkedPositions: () => void;
 
-  updatePlayerActivity: () => Promise<void>;
   checkForWinner: () => Promise<void>;
   announceWin: () => Promise<void>;
-  startPolling: () => void;
-  stopPolling: () => void;
-  refreshGameState: () => Promise<void>;
   handleRealtimeUpdate: (game: Game) => void;
   setConnectionStatus: (isConnected: boolean) => void;
 
@@ -68,12 +58,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   playerState: null,
   localGames: [],
   isLoading: false,
-  pollingInterval: null,
   currentPlayerId: null,
   isConnected: false,
-  optimisticState: null,
-  lastServerState: null,
-  optimisticWinClaim: false,
 
   createGame: async (title) => {
     const game = await createGame(title);
@@ -102,7 +88,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
         set({
           currentGame: null,
           playerState: null,
-          lastServerState: null,
           isLoading: false,
         });
         return;
@@ -124,7 +109,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
         currentGame: game,
         playerState: playerState || null,
         currentPlayerId: playerId,
-        lastServerState: game,
         isLoading: false,
       });
 
@@ -134,15 +118,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
         onConnectionChange: (isConnected) =>
           get().setConnectionStatus(isConnected),
       });
-
-      if (playerState) {
-        get().startPolling();
-      }
     } catch (error) {
       set({
         currentGame: null,
         playerState: null,
-        lastServerState: null,
         isLoading: false,
       });
     }
@@ -189,11 +168,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
         }
       }),
     );
-
-    const syncManager = getSyncManager();
-    if (syncManager) {
-      syncManager.markActivity();
-    }
   },
 
   deleteGame: async (gameId) => {
@@ -219,7 +193,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       currentGame: game,
       playerState,
       currentPlayerId: playerId,
-      lastServerState: game,
     });
 
     const syncManager = getSyncManager();
@@ -228,8 +201,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       onConnectionChange: (isConnected) =>
         get().setConnectionStatus(isConnected),
     });
-
-    get().startPolling();
   },
 
   markPosition: (position) => {
@@ -240,16 +211,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       return;
     }
 
-    const syncManager = getSyncManager();
-    if (syncManager) {
-      syncManager.markActivity();
-    }
-
     set(
       produce((draft: WritableDraft<GameStore>) => {
         if (!draft.playerState || !draft.currentGame) return;
-
-        draft.optimisticState = { ...draft.playerState };
 
         const marked = draft.playerState.markedPositions as number[];
         const isUnmarking = marked.includes(position);
@@ -283,16 +247,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       Promise.all([
         persistPlayerState(updatedState.playerState),
         saveGameLocal(updatedState.currentGame),
-      ]).catch(() => {
-        set(
-          produce((draft: WritableDraft<GameStore>) => {
-            if (draft.optimisticState) {
-              draft.playerState = draft.optimisticState;
-              draft.optimisticState = null;
-            }
-          }),
-        );
-      });
+      ]).catch(() => {});
 
       get().checkForWinner();
     }
@@ -311,13 +266,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (playerState) {
       persistPlayerState(playerState);
     }
-  },
-
-  updatePlayerActivity: async () => {
-    const { currentGame, currentPlayerId } = get();
-    if (!currentGame || !currentPlayerId) return;
-
-    await updateActivity(currentGame, currentPlayerId);
   },
 
   checkForWinner: async () => {
@@ -339,66 +287,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { currentGame, playerState, currentPlayerId } = get();
     if (!currentGame || !playerState || !currentPlayerId) return;
 
-    set({ optimisticWinClaim: true });
-
     const result = await claimWin(currentGame, playerState, currentPlayerId);
 
     if (result.accepted) {
       set({
         currentGame: result.game,
-        lastServerState: result.game,
         playerState: { ...playerState, hasWon: true },
-        optimisticWinClaim: false,
       });
     } else {
       set({
         currentGame: result.game,
-        lastServerState: result.game,
         playerState: { ...playerState, hasWon: false },
-        optimisticWinClaim: false,
       });
     }
-  },
-
-  startPolling: () => {
-    const syncManager = getSyncManager();
-    if (syncManager) {
-      syncManager.pollNow();
-    }
-
-    const { pollingInterval } = get();
-    if (pollingInterval) return;
-
-    const interval = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
-        get().updatePlayerActivity();
-      }
-    }, TIMEOUTS.ACTIVITY_CHECK);
-
-    set({ pollingInterval: interval });
-  },
-
-  stopPolling: () => {
-    const { pollingInterval } = get();
-    if (pollingInterval) {
-      clearInterval(pollingInterval);
-      set({ pollingInterval: null });
-    }
-
-    resetSyncManager();
-  },
-
-  refreshGameState: async () => {
-    const { currentGame } = get();
-    if (!currentGame) return;
-
-    try {
-      const latestGame = await loadGame(currentGame.gameCode);
-
-      if (latestGame) {
-        get().handleRealtimeUpdate(latestGame);
-      }
-    } catch (error) {}
   },
 
   handleRealtimeUpdate: (latestGame: Game) => {
@@ -414,7 +315,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     set({
       currentGame: updatedGame,
-      lastServerState: latestGame,
     });
 
     // Check if we won
@@ -435,15 +335,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   setConnectionStatus: (isConnected: boolean) => {
-    const previouslyConnected = get().isConnected;
     set({ isConnected });
-
-    if (!previouslyConnected && isConnected) {
-      const { optimisticWinClaim, playerState } = get();
-      if (optimisticWinClaim && playerState?.hasWon) {
-        get().announceWin();
-      }
-    }
   },
 
   initialize: async () => {

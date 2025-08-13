@@ -5,11 +5,7 @@ import {
   loadPlayerState,
   loadGameByCode,
 } from "../../lib/storage";
-import {
-  upsertPlayer,
-  updatePlayerActivity as updateActivity,
-} from "../calculations/gameCalculations";
-import { getSyncManager } from "../../lib/syncManager";
+import { upsertPlayer } from "../calculations/gameCalculations";
 import { PlayerStateSchema } from "../../schemas/gameSchemas";
 import { safeValidate, sanitizeString } from "../../schemas/validation";
 
@@ -65,23 +61,6 @@ export async function joinGame(
   }
 
   return { game: updatedGame, playerState, playerId };
-}
-
-/**
- * Update player activity
- */
-export async function updatePlayerActivity(
-  game: Game,
-  playerId: string,
-): Promise<Game> {
-  const syncManager = getSyncManager();
-  if (syncManager) {
-    syncManager.markActivity();
-  }
-
-  const updatedGame = updateActivity(game, playerId);
-  await saveGameLocal(updatedGame);
-  return updatedGame;
 }
 
 /**

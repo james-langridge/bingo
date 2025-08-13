@@ -49,7 +49,6 @@ describe("gameStore", () => {
       playerState: null,
       localGames: [],
       isLoading: false,
-      pollingInterval: null,
       currentPlayerId: null,
     });
 
@@ -71,11 +70,6 @@ describe("gameStore", () => {
   });
 
   afterEach(() => {
-    // Stop any polling intervals
-    const state = useGameStore.getState();
-    if (state.pollingInterval) {
-      clearInterval(state.pollingInterval);
-    }
     vi.clearAllMocks();
   });
 

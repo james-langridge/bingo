@@ -70,26 +70,6 @@ export function upsertPlayer(
 }
 
 /**
- * Update player activity timestamp
- */
-export function updatePlayerActivity(game: Game, playerId: string): Game {
-  const playerExists = game.players.some((p) => p.id === playerId);
-  if (!playerExists) {
-    return game;
-  }
-
-  const updatedPlayers = game.players.map((p) =>
-    p.id === playerId ? { ...p, lastSeenAt: Date.now(), isOnline: true } : p,
-  );
-
-  return {
-    ...game,
-    players: updatedPlayers,
-    lastModifiedAt: Date.now(),
-  };
-}
-
-/**
  * Mark a player as winner
  */
 export function markPlayerAsWinner(game: Game, playerId: string): Game {

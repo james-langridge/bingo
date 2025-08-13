@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useGameStore } from "../stores/gameStore";
 import { GameBoard } from "./GameBoard";
@@ -6,7 +6,6 @@ import { Celebration } from "./Celebration";
 import { LoadingSkeleton } from "./LoadingSkeleton";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { WinnerNotification } from "./WinnerNotification";
-import { usePullToRefresh } from "../hooks/usePullToRefresh";
 import { shuffleItems } from "../lib/calculations";
 
 export function GamePlayer() {
@@ -20,14 +19,11 @@ export function GamePlayer() {
     joinGame,
     markPosition,
     clearMarkedPositions,
-    stopPolling,
-    refreshGameState,
   } = useGameStore();
   const [displayName, setDisplayName] = useState("");
   const [isJoining, setIsJoining] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Deterministic shuffle - always call this hook, even if we don't use the result yet
   const shuffledItems = useMemo(() => {
@@ -70,23 +66,6 @@ export function GamePlayer() {
       });
     }
   }, [currentGame?.winner, playerState?.displayName]);
-
-  // Cleanup polling on unmount
-  useEffect(() => {
-    return () => {
-      stopPolling();
-    };
-  }, [stopPolling]);
-
-  const handleRefresh = useCallback(async () => {
-    if (!code) return;
-    setIsRefreshing(true);
-    await refreshGameState();
-    setTimeout(() => setIsRefreshing(false), 500);
-  }, [code, refreshGameState]);
-
-  const { containerRef, isPulling, pullDistance } =
-    usePullToRefresh(handleRefresh);
 
   const handleJoinGame = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -230,49 +209,7 @@ export function GamePlayer() {
       : false;
 
   return (
-    <div
-      ref={containerRef}
-      className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 py-8 relative"
-      style={{
-        transform: isPulling
-          ? `translateY(${pullDistance}px)`
-          : "translateY(0)",
-        transition: isPulling ? "none" : "transform 0.3s ease-out",
-      }}
-    >
-      {/* Pull to refresh indicator */}
-      {isPulling && (
-        <div className="absolute top-0 left-0 right-0 flex justify-center pt-2">
-          <div className="bg-white rounded-full p-2 shadow-lg">
-            <svg
-              className="w-6 h-6 text-gray-600 animate-spin"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              />
-            </svg>
-          </div>
-        </div>
-      )}
-
-      {isRefreshing && (
-        <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
-          <div className="text-lg font-semibold">Refreshing...</div>
-        </div>
-      )}
-
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 py-8 relative">
       <div className="container mx-auto px-4 max-w-4xl">
         <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 mb-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
