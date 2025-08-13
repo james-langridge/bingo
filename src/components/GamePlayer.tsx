@@ -7,6 +7,7 @@ import { LoadingSkeleton } from "./LoadingSkeleton";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { WinnerNotification } from "./WinnerNotification";
 import { shuffleItems } from "../lib/calculations";
+import { getSyncManager } from "../lib/syncManager";
 
 export function GamePlayer() {
   const navigate = useNavigate();
@@ -66,6 +67,15 @@ export function GamePlayer() {
       });
     }
   }, [currentGame?.winner, playerState?.displayName]);
+
+  // Cleanup SSE connection when leaving the game page
+  useEffect(() => {
+    return () => {
+      const syncManager = getSyncManager();
+      syncManager.disconnect();
+      console.log("[GamePlayer] Cleaned up SSE connection on unmount");
+    };
+  }, []);
 
   const handleJoinGame = async (e: React.FormEvent) => {
     e.preventDefault();
