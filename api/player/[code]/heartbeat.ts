@@ -28,6 +28,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const game = typeof gameData === "string" ? JSON.parse(gameData) : gameData;
 
+    // Find the player and check if they were offline
+    const player = game.players?.find((p: any) => p.id === playerId);
+    const wasOffline = player && Date.now() - (player.lastSeenAt || 0) > 15000;
+
     // Update the player's lastSeenAt
     const updatedPlayers =
       game.players?.map((p: any) =>
@@ -43,6 +47,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await redis.set(`game:${code}`, JSON.stringify(updatedGame), {
       ex: 7 * 24 * 60 * 60, // 7 days TTL
     });
+
+    // If player was offline and is coming back, send wake-up signal
+    if (wasOffline) {
+      await redis.set(`game:${code}:wakeup`, Date.now().toString(), {
+        ex: 60, // Wake-up signal expires after 1 minute
+      });
+      console.log(
+        `[Heartbeat] Player ${playerId} returned - wake-up signal sent`,
+      );
+    }
 
     console.log(
       `[Heartbeat] Player ${playerId} in game ${code} marked as online`,

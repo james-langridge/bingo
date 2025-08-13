@@ -33,6 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let pollCount = 0;
   let pollInterval = 500; // Start with 500ms
   let pollTimer: NodeJS.Timeout | null = null;
+  let lastWakeupCheck = 0;
 
   // Function to check and send updates
   const checkForUpdates = async () => {
@@ -56,11 +57,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // Intelligent polling based on player count
       if (onlineCount <= 1) {
-        // 0 or 1 players: No need for real-time sync!
-        // Stop polling entirely - will resume when players join
+        // 0 or 1 players: Check for wake-up signal
         pollInterval = 0;
 
-        // Still send the update if data changed (for player joining/leaving notifications)
+        // Check if there's been a recent join event (wake-up signal)
+        const wakeupSignal = await redis.get(`game:${code}:wakeup`);
+        const wakeupTime = wakeupSignal ? Number(wakeupSignal) : 0;
+        const timeSinceWakeup = now - wakeupTime;
+
+        // If there was a recent wake-up (within 2 seconds), start polling temporarily
+        if (wakeupTime > lastWakeupCheck && timeSinceWakeup < 2000) {
+          console.log(
+            `[SSE] Game ${code}: Wake-up signal detected, resuming polling`,
+          );
+          lastWakeupCheck = wakeupTime;
+          pollInterval = 500; // Resume fast polling temporarily
+        }
+
+        // Still send the update if data changed
         const currentData = JSON.stringify({
           ...game,
           onlineCount,
@@ -72,14 +86,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
           if (onlineCount !== lastOnlineCount) {
             console.log(
-              `[SSE] Game ${code}: ${onlineCount} players online - pausing sync`,
+              `[SSE] Game ${code}: ${onlineCount} players online - ${pollInterval > 0 ? "active" : "paused"}`,
             );
             lastOnlineCount = onlineCount;
           }
         }
 
-        // Schedule a check in 5 seconds to see if more players joined
-        pollTimer = setTimeout(() => checkForUpdates(), 5000);
+        // Schedule next check based on whether we're in wake-up mode
+        if (pollInterval > 0) {
+          // We're in wake-up mode, poll quickly for a bit
+          pollTimer = setTimeout(() => checkForUpdates(), 500);
+        } else {
+          // No activity, check less frequently for wake-up signals
+          pollTimer = setTimeout(() => checkForUpdates(), 10000); // Check every 10 seconds
+        }
         return true;
       } else {
         // 2+ players: Need real-time sync

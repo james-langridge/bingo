@@ -209,6 +209,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ex: 30 * 24 * 60 * 60,
       });
 
+      // Check if new players joined (comparing before and after)
+      const existingPlayerCount = existingData
+        ? (typeof existingData === "string"
+            ? JSON.parse(existingData)
+            : existingData
+          ).players?.length || 0
+        : 0;
+      const newPlayerCount = finalGame.players?.length || 0;
+
+      if (newPlayerCount > existingPlayerCount) {
+        // New player(s) joined - send wake-up signal for SSE
+        await redis.set(`game:${code}:wakeup`, Date.now().toString(), {
+          ex: 60, // Wake-up signal expires after 1 minute
+        });
+        logger.info({
+          msg: "Wake-up signal sent for new player",
+          gameCode: code,
+          previousCount: existingPlayerCount,
+          newCount: newPlayerCount,
+        });
+      }
+
       logger.info({
         msg: "Game saved successfully",
         gameCode: code,
