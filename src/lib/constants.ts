@@ -2,7 +2,6 @@
 export const TIMEOUTS = {
   ACTIVITY_CHECK: 60_000, // 60 seconds for vacation mode activity checks
   ONLINE_THRESHOLD: 15_000, // 15 seconds to consider player online
-  NEAR_MISS_WINDOW: 5_000, // 5 seconds for near-miss detection
   RECOVERY_WINDOW: 300_000, // 5 minutes for state recovery
   PLAYER_JOIN_RECENT: 30_000, // 30 seconds to consider join recent
 } as const;

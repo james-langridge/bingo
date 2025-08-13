@@ -36,13 +36,3 @@ export function createWinnerInfo(
     winningPositions: markedPositions,
   };
 }
-
-/**
- * Check if a win claim happened within the near-miss window
- */
-export function isNearMiss(
-  timeDifference: number,
-  nearMissWindow: number,
-): boolean {
-  return timeDifference < nearMissWindow;
-}

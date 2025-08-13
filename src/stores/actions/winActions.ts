@@ -3,19 +3,13 @@ import { saveGameLocal, savePlayerState } from "../../lib/storage";
 import {
   checkWinCondition,
   createWinnerInfo,
-  isNearMiss as checkNearMiss,
 } from "../calculations/winValidation";
 import { markPlayerAsWinner } from "../calculations/gameCalculations";
 import { getSyncManager } from "../../lib/syncManager";
-import { TIMEOUTS } from "../../lib/constants";
 
 interface WinClaimResult {
   accepted: boolean;
   game: Game;
-  nearMiss?: {
-    winnerName: string;
-    timeDifference: number;
-  };
 }
 
 /**
@@ -69,17 +63,6 @@ export async function claimWin(
       return { accepted: true, game: latestGame };
     }
 
-    const timeDiff = Date.now() - latestGame.winner.wonAt;
-    if (checkNearMiss(timeDiff, TIMEOUTS.NEAR_MISS_WINDOW)) {
-      return {
-        accepted: false,
-        game: latestGame,
-        nearMiss: {
-          winnerName: latestGame.winner.displayName,
-          timeDifference: timeDiff,
-        },
-      };
-    }
     return { accepted: false, game: latestGame };
   }
 
@@ -115,17 +98,6 @@ export async function claimWin(
       if (response.ok && result.accepted) {
         return { accepted: true, game: result.game };
       } else if (result.actualWinner) {
-        const timeDiff = Math.abs(Date.now() - result.actualWinner.wonAt);
-        if (checkNearMiss(timeDiff, TIMEOUTS.NEAR_MISS_WINDOW)) {
-          return {
-            accepted: false,
-            game: result.game,
-            nearMiss: {
-              winnerName: result.actualWinner.displayName,
-              timeDifference: timeDiff,
-            },
-          };
-        }
         return { accepted: false, game: result.game };
       }
     } catch (error) {}

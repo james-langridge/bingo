@@ -44,11 +44,6 @@ interface GameStore {
   optimisticState: PlayerState | null;
   lastServerState: Game | null;
   optimisticWinClaim: boolean;
-  nearMissInfo: {
-    winnerName: string;
-    timeDifference: number;
-    showNotification: boolean;
-  } | null;
 
   createGame: (title: string) => Promise<Game>;
   loadGame: (gameCode: string) => Promise<void>;
@@ -83,7 +78,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
   optimisticState: null,
   lastServerState: null,
   optimisticWinClaim: false,
-  nearMissInfo: null,
 
   createGame: async (title) => {
     const game = await createGame(title);
@@ -361,7 +355,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
         lastServerState: result.game,
         playerState: { ...playerState, hasWon: true },
         optimisticWinClaim: false,
-        nearMissInfo: null,
       });
     } else {
       set({
@@ -370,20 +363,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
         playerState: { ...playerState, hasWon: false },
         optimisticWinClaim: false,
       });
-
-      if (result.nearMiss) {
-        set(
-          produce((draft: WritableDraft<GameStore>) => {
-            if (result.nearMiss) {
-              draft.nearMissInfo = {
-                winnerName: result.nearMiss.winnerName || "",
-                timeDifference: result.nearMiss.timeDifference || 0,
-                showNotification: true,
-              };
-            }
-          }),
-        );
-      }
     }
   },
 
@@ -471,32 +450,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const mergedGame = mergeGameStates(currentGame, gameToMerge);
 
     if (mergedGame.winner && !currentGame.winner) {
-      if (mergedGame.winner.playerId === currentPlayerId) {
-        set(
-          produce((draft: WritableDraft<GameStore>) => {
-            draft.nearMissInfo = null;
-          }),
-        );
-      } else {
-        if (
-          playerState &&
-          currentGame.items &&
-          playerState.markedPositions.length === currentGame.items.length
-        ) {
-          const timeDiff = Date.now() - mergedGame.winner.wonAt;
-          if (timeDiff < TIMEOUTS.NEAR_MISS_WINDOW) {
-            set(
-              produce((draft: WritableDraft<GameStore>) => {
-                draft.nearMissInfo = {
-                  winnerName: mergedGame.winner!.displayName,
-                  timeDifference: timeDiff,
-                  showNotification: true,
-                };
-              }),
-            );
-          }
-        }
-      }
     }
 
     const currentPlayerCount = currentGame.players?.length || 0;
