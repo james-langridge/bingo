@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useGameStore } from "../stores/gameStore";
 import { ShareModal } from "./ShareModal";
+import { getSyncManager } from "../lib/syncManager";
 import type { BingoItem } from "../types/types.ts";
 
 export function GameEditor() {
@@ -58,6 +59,14 @@ export function GameEditor() {
       }
     }
   }, [currentGame]);
+
+  // Cleanup SSE connection when leaving the editor
+  useEffect(() => {
+    return () => {
+      const syncManager = getSyncManager();
+      syncManager.disconnect();
+    };
+  }, []);
 
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();

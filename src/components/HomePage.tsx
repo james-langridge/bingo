@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useGameStore } from "../stores/gameStore";
 // import { gameTemplates } from '../lib/templates';
 import { LoadingSkeleton } from "./LoadingSkeleton";
+import { getSyncManager } from "../lib/syncManager";
 
 export function HomePage() {
   const navigate = useNavigate();
@@ -14,6 +15,10 @@ export function HomePage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Disconnect any lingering SSE connections when arriving at homepage
+    const syncManager = getSyncManager();
+    syncManager.disconnect();
+
     initialize().finally(() => setIsLoading(false));
   }, [initialize]);
 
