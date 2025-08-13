@@ -76,7 +76,7 @@ export async function updatePlayerActivity(
 ): Promise<Game> {
   const syncManager = getSyncManager();
   if (syncManager) {
-    syncManager.markActivity(false);
+    syncManager.markActivity();
   }
 
   const updatedGame = updateActivity(game, playerId);

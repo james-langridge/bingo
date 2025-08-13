@@ -6,16 +6,6 @@ export const TIMEOUTS = {
   PLAYER_JOIN_RECENT: 30_000, // 30 seconds to consider join recent
 } as const;
 
-// Polling intervals for sync manager
-export const POLLING = {
-  ACTIVE: 2_000, // 2 seconds during active play
-  IDLE: 10_000, // 10 seconds after 1 minute idle
-  INACTIVE: 30_000, // 30 seconds after 5 minutes idle
-  IMMEDIATE_DELAY: 100, // 100ms for immediate poll after action
-  IDLE_THRESHOLD: 60_000, // 1 minute to enter idle mode
-  INACTIVE_THRESHOLD: 300_000, // 5 minutes to enter inactive mode
-} as const;
-
 // Storage and sync configuration
 export const STORAGE = {
   SYNC_THROTTLE_MS: 1_000, // 1 second minimum between syncs

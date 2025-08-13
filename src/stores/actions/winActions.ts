@@ -45,7 +45,7 @@ export async function claimWin(
 ): Promise<WinClaimResult> {
   const syncManager = getSyncManager();
   if (syncManager) {
-    syncManager.markActivity(true);
+    syncManager.markActivity();
   }
 
   let latestGame: Game | null = null;

@@ -3,11 +3,7 @@ import { produce } from "immer";
 import type { WritableDraft } from "immer";
 import type { Game, PlayerState, BingoItem } from "../types/types.ts";
 import { loadPlayerState, saveGameLocal } from "../lib/storage";
-import {
-  getSyncManager,
-  resetSyncManager,
-  mergeGameStates,
-} from "../lib/syncManager";
+import { getSyncManager, resetSyncManager } from "../lib/syncManager";
 import { TIMEOUTS } from "../lib/constants";
 
 import {
@@ -132,18 +128,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
         isLoading: false,
       });
 
-      const syncManager = getSyncManager({
+      const syncManager = getSyncManager();
+      syncManager.connect(gameCode, {
         onGameUpdate: (updatedGame) => get().handleRealtimeUpdate(updatedGame),
         onConnectionChange: (isConnected) =>
           get().setConnectionStatus(isConnected),
-        onWinnerAnnounced: () => {},
       });
-      syncManager.connect(gameCode);
-
-      // Update initial player count
-      if (game.players) {
-        syncManager.updateActivePlayerCount(game.players);
-      }
 
       if (playerState) {
         get().startPolling();
@@ -202,7 +192,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     const syncManager = getSyncManager();
     if (syncManager) {
-      syncManager.markActivity(true);
+      syncManager.markActivity();
     }
   },
 
@@ -232,18 +222,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
       lastServerState: game,
     });
 
-    const syncManager = getSyncManager({
+    const syncManager = getSyncManager();
+    syncManager.connect(gameCode, {
       onGameUpdate: (updatedGame) => get().handleRealtimeUpdate(updatedGame),
       onConnectionChange: (isConnected) =>
         get().setConnectionStatus(isConnected),
-      onWinnerAnnounced: () => {},
     });
-    syncManager.connect(gameCode);
-
-    // Update initial player count after joining
-    if (game.players) {
-      syncManager.updateActivePlayerCount(game.players);
-    }
 
     get().startPolling();
   },
@@ -258,7 +242,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     const syncManager = getSyncManager();
     if (syncManager) {
-      syncManager.markActivity(true);
+      syncManager.markActivity();
     }
 
     set(
@@ -421,47 +405,22 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { currentGame, currentPlayerId, playerState } = get();
     if (!currentGame) return;
 
-    // Always use mergeGameStates for proper markedBy merging
-    const mergedGame = mergeGameStates(currentGame, latestGame);
-
-    if (mergedGame.winner && !currentGame.winner) {
-    }
-
-    const currentPlayerCount = currentGame.players?.length || 0;
-    const latestPlayerCount = mergedGame.players?.length || 0;
-    if (latestPlayerCount > currentPlayerCount) {
-    }
-
-    const now = Date.now();
-
-    const updatedPlayers = mergedGame.players.map((p) => ({
-      ...p,
-      isOnline:
-        p.id === currentPlayerId
-          ? true
-          : now - (p.lastSeenAt || 0) < TIMEOUTS.ONLINE_THRESHOLD,
-    }));
-
+    // Just use the server's version directly
+    // Preserve adminToken if we have it locally
     const updatedGame: Game = {
-      ...mergedGame,
-      players: updatedPlayers,
+      ...latestGame,
       ...(currentGame.adminToken ? { adminToken: currentGame.adminToken } : {}),
     };
 
     set({
       currentGame: updatedGame,
-      lastServerState: updatedGame,
+      lastServerState: latestGame,
     });
 
-    // Update sync manager with new player count
-    const syncManager = getSyncManager();
-    if (syncManager) {
-      syncManager.updateActivePlayerCount(updatedPlayers);
-    }
-
+    // Check if we won
     if (
-      mergedGame.winner &&
-      mergedGame.winner.playerId === currentPlayerId &&
+      latestGame.winner &&
+      latestGame.winner.playerId === currentPlayerId &&
       playerState &&
       !playerState.hasWon
     ) {
