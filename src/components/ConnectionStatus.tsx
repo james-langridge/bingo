@@ -2,9 +2,32 @@ import { useEffect, useState } from "react";
 import { useGameStore } from "../stores/gameStore";
 
 export function ConnectionStatus() {
-  const { isConnected } = useGameStore();
+  const { isConnected, playerState, currentGame } = useGameStore();
   const [showReconnecting, setShowReconnecting] = useState(false);
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
+  const [timeSinceSync, setTimeSinceSync] = useState<string>("");
+
+  // Update time since last sync
+  useEffect(() => {
+    const updateTimeSinceSync = () => {
+      if (!playerState?.lastSyncAt) {
+        setTimeSinceSync("");
+        return;
+      }
+      
+      const seconds = Math.floor((Date.now() - playerState.lastSyncAt) / 1000);
+      if (seconds < 60) {
+        setTimeSinceSync(`${seconds}s ago`);
+      } else {
+        const minutes = Math.floor(seconds / 60);
+        setTimeSinceSync(`${minutes}m ago`);
+      }
+    };
+
+    updateTimeSinceSync();
+    const interval = setInterval(updateTimeSinceSync, 1000);
+    return () => clearInterval(interval);
+  }, [playerState?.lastSyncAt]);
 
   useEffect(() => {
     let timeout: number;
@@ -21,6 +44,11 @@ export function ConnectionStatus() {
     return () => clearTimeout(timeout);
   }, [isConnected]);
 
+  // Don't show if no game is loaded or game has never been synced
+  if (!currentGame || (!playerState?.lastSyncAt && currentGame.items.length === 0)) {
+    return null;
+  }
+
   // Don't show anything if connected and working normally
   if (isConnected && !showReconnecting) {
     return (
@@ -30,7 +58,9 @@ export function ConnectionStatus() {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
           </span>
-          <span className="text-xs font-medium">Synced</span>
+          <span className="text-xs font-medium">
+            Synced {timeSinceSync}
+          </span>
         </div>
       </div>
     );
@@ -62,8 +92,8 @@ export function ConnectionStatus() {
           </svg>
           <span className="text-xs font-medium">
             {reconnectAttempts > 3 
-              ? "Offline - Using cached data" 
-              : "Syncing..."}
+              ? `Offline ${timeSinceSync ? `(${timeSinceSync})` : ''}` 
+              : "Reconnecting..."}
           </span>
         </div>
       </div>

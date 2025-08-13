@@ -311,9 +311,6 @@ export function GamePlayer() {
               <h3 className="text-sm font-semibold text-gray-700">
                 Players in Game ({currentGame.players.length})
               </h3>
-              <span className="text-xs text-gray-500">
-                Live updates
-              </span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
               {currentGame.players.map((player) => (
