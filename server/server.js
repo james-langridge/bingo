@@ -23,10 +23,11 @@ const fastify = Fastify({
   },
 });
 
-// Serve static files (the built React app)
+// Serve static files (the built React app) but don't take over all GET routes
 await fastify.register(fastifyStatic, {
   root: path.join(__dirname, "../dist"),
   prefix: "/",
+  wildcard: false, // prevents auto /* registration
 });
 
 // Upstash Redis for data storage
@@ -384,9 +385,13 @@ fastify.post("/api/game/:code/claim-win", async (request, reply) => {
   }
 });
 
-// Catch-all route for SPA - must be last!
-fastify.get("/*", async (request, reply) => {
-  return reply.sendFile("index.html");
+// SPA fallback — sends index.html for all non-API GET requests
+fastify.setNotFoundHandler((req, reply) => {
+  if (req.raw.method === "GET" && !req.raw.url.startsWith("/api")) {
+    reply.type("text/html").sendFile("index.html");
+  } else {
+    reply.code(404).send({ error: "Not Found" });
+  }
 });
 
 // Start the server
