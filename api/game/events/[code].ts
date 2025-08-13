@@ -1,3 +1,4 @@
+import { VercelRequest, VercelResponse } from "@vercel/node";
 import { Redis } from "@upstash/redis";
 
 const redis = new Redis({
@@ -5,21 +6,26 @@ const redis = new Redis({
   token: process.env.KV_REST_API_TOKEN!,
 });
 
-// IMPORTANT: Use Node.js runtime, not Edge
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const maxDuration = 300; // 5 minutes on Pro plan, 10 seconds on Hobby
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Only allow GET requests
+  if (req.method !== "GET") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
 
-export async function GET(
-  request: Request,
-  { params }: { params: { code: string } },
-) {
-  const { code } = params;
-  const encoder = new TextEncoder();
+  // Extract game code from the URL
+  const code = req.query.code as string;
 
-  // Create a TransformStream for SSE
-  const stream = new TransformStream();
-  const writer = stream.writable.getWriter();
+  if (!code) {
+    return res.status(400).json({ error: "Game code is required" });
+  }
+
+  // Set SSE headers
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no", // Disable Nginx buffering
+  });
 
   // Track last sent data to avoid duplicate sends
   let lastGameData: string | null = null;
@@ -31,7 +37,7 @@ export async function GET(
       const gameData = await redis.get(`game:${code}`);
 
       if (!gameData) {
-        writer.write(encoder.encode(`data: {"error":"Game not found"}\n\n`));
+        res.write(`data: {"error":"Game not found"}\n\n`);
         return;
       }
 
@@ -52,7 +58,7 @@ export async function GET(
 
       // Only send if data changed
       if (currentData !== lastGameData) {
-        writer.write(encoder.encode(`data: ${currentData}\n\n`));
+        res.write(`data: ${currentData}\n\n`);
         lastGameData = currentData;
 
         // Log player count changes for debugging
@@ -76,24 +82,18 @@ export async function GET(
 
   // Send heartbeat every 30 seconds to keep connection alive
   const heartbeatInterval = setInterval(() => {
-    writer.write(encoder.encode(":heartbeat\n\n"));
+    res.write(":heartbeat\n\n");
   }, 30000);
 
   // Cleanup on client disconnect
-  request.signal.addEventListener("abort", () => {
+  req.on("close", () => {
     clearInterval(pollInterval);
     clearInterval(heartbeatInterval);
-    writer.close();
     console.log(`[SSE] Client disconnected from game ${code}`);
+    res.end();
   });
 
-  // Return the SSE response
-  return new Response(stream.readable, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-      "X-Accel-Buffering": "no", // Disable Nginx buffering
-    },
-  });
+  // Keep connection open
+  // Note: Vercel has a 10 second timeout on hobby plan, 5 minutes on pro
+  // The connection will auto-reconnect when it times out
 }
