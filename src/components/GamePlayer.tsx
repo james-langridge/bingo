@@ -68,11 +68,19 @@ export function GamePlayer() {
     }
   }, [currentGame?.winner, playerState?.displayName]);
 
-  // Send heartbeat to keep player marked as online
+  // Send heartbeat to keep player marked as online (pause when tab hidden)
   useEffect(() => {
     if (!currentGame || !playerState || !currentPlayerId) return;
 
+    let heartbeatInterval: NodeJS.Timeout | null = null;
+
     const sendHeartbeat = async () => {
+      // Don't send heartbeat if tab is hidden
+      if (document.hidden) {
+        console.log("[GamePlayer] Tab hidden, skipping heartbeat");
+        return;
+      }
+
       try {
         // Send heartbeat to dedicated endpoint
         await fetch(`/api/player/${currentGame.gameCode}/heartbeat`, {
@@ -87,14 +95,52 @@ export function GamePlayer() {
       }
     };
 
-    // Send initial heartbeat
-    sendHeartbeat();
+    const startHeartbeat = () => {
+      // Send initial heartbeat
+      sendHeartbeat();
 
-    // Send heartbeat every 10 seconds (well under the 15 second timeout)
-    const interval = setInterval(sendHeartbeat, 10000);
+      // Clear any existing interval
+      if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+      }
+
+      // Send heartbeat every 10 seconds (well under the 15 second timeout)
+      heartbeatInterval = setInterval(sendHeartbeat, 10000);
+      console.log("[GamePlayer] Started heartbeat interval");
+    };
+
+    const stopHeartbeat = () => {
+      if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+        heartbeatInterval = null;
+        console.log("[GamePlayer] Stopped heartbeat interval");
+      }
+    };
+
+    // Handle visibility changes
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Tab is hidden - stop heartbeat
+        console.log("[GamePlayer] Tab hidden - stopping heartbeat");
+        stopHeartbeat();
+      } else {
+        // Tab is visible - restart heartbeat
+        console.log("[GamePlayer] Tab visible - restarting heartbeat");
+        startHeartbeat();
+      }
+    };
+
+    // Listen for visibility changes
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    // Start heartbeat if tab is currently visible
+    if (!document.hidden) {
+      startHeartbeat();
+    }
 
     return () => {
-      clearInterval(interval);
+      stopHeartbeat();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [currentGame?.gameCode, currentPlayerId]);
 
