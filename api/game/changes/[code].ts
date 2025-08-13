@@ -62,20 +62,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const game = typeof gameData === "string" ? JSON.parse(gameData) : gameData;
     const currentVersion = generateGameVersion(game);
 
-    // If version matches, nothing has changed
+    // Calculate active player count
+    const now = Date.now();
+    const activePlayerCount =
+      game.players?.filter(
+        (p: any) => now - (p.lastSeenAt || 0) < 15000, // 15 seconds threshold
+      ).length || 0;
+
+    // If version matches, nothing has changed - but still return player count
     if (version && version === currentVersion) {
-      return res.status(304).end();
+      return res.status(200).json({
+        version: currentVersion,
+        activePlayerCount,
+        noChanges: true,
+      });
     }
 
-    // If nothing has changed since the timestamp
+    // If nothing has changed since the timestamp - but still return player count
     if (since && game.lastModifiedAt && game.lastModifiedAt <= since) {
-      return res.status(304).end();
+      return res.status(200).json({
+        version: currentVersion,
+        activePlayerCount,
+        noChanges: true,
+      });
     }
 
     // Prepare response with only necessary data
     const response = {
       version: currentVersion,
       lastModifiedAt: game.lastModifiedAt || Date.now(),
+      activePlayerCount,
       changes: {
         // Only send full game if significant changes occurred
         fullUpdate: !since || since < game.lastModifiedAt - 60000, // Full update if more than 1 minute behind

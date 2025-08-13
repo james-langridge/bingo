@@ -96,18 +96,30 @@ class SyncManager {
 
     // If multiple players are online, always use active polling
     if (this.pollingState.activePlayerCount > 1) {
+      console.log(
+        `[SyncManager] Multiple players online (${this.pollingState.activePlayerCount}), using ACTIVE polling (${POLLING.ACTIVE}ms)`,
+      );
       return POLLING.ACTIVE;
     }
 
     // Single player: use activity-based intervals
     if (timeSinceActivity < POLLING.IDLE_THRESHOLD) {
+      console.log(
+        `[SyncManager] Single player, recent activity, using ACTIVE polling (${POLLING.ACTIVE}ms)`,
+      );
       return POLLING.ACTIVE;
     }
 
     if (timeSinceActivity < POLLING.INACTIVE_THRESHOLD) {
+      console.log(
+        `[SyncManager] Single player, idle, using IDLE polling (${POLLING.IDLE}ms)`,
+      );
       return POLLING.IDLE;
     }
 
+    console.log(
+      `[SyncManager] Single player, inactive, using INACTIVE polling (${POLLING.INACTIVE}ms)`,
+    );
     return POLLING.INACTIVE;
   }
 
@@ -135,16 +147,28 @@ class SyncManager {
         },
       );
 
-      if (response.status === 304) {
-        this.handleSuccessfulPoll();
-        return;
-      }
-
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
 
       const data = await response.json();
+
+      // Check if this is a no-changes response
+      if (data.noChanges) {
+        // Still update player count even when no game changes
+        if (typeof data.activePlayerCount === "number") {
+          const prevCount = this.pollingState.activePlayerCount;
+          this.pollingState.activePlayerCount = data.activePlayerCount;
+          if (prevCount !== data.activePlayerCount) {
+            console.log(
+              `[SyncManager] Player count changed: ${prevCount} -> ${data.activePlayerCount}`,
+            );
+          }
+        }
+        this.handleSuccessfulPoll();
+        return;
+      }
+
       this.handlePollResponse(data);
       this.handleSuccessfulPoll();
     } catch (error) {
@@ -164,6 +188,7 @@ class SyncManager {
       version?: string;
       lastModifiedAt?: number;
       timestamp?: number;
+      activePlayerCount?: number;
       changes?: {
         fullUpdate?: boolean;
         game?: Game;
@@ -173,21 +198,33 @@ class SyncManager {
       };
     };
 
-    const { version, lastModifiedAt, changes, timestamp } = response;
+    const { version, lastModifiedAt, changes, timestamp, activePlayerCount } =
+      response;
 
-    // Update active player count
-    if (changes?.players) {
-      const now = Date.now();
-      const activePlayers = changes.players.filter(
-        (p) => now - (p.lastSeenAt || 0) < TIMEOUTS.ONLINE_THRESHOLD,
-      );
-      this.pollingState.activePlayerCount = activePlayers.length;
-    } else if (changes?.fullUpdate && changes.game?.players) {
-      const now = Date.now();
-      const activePlayers = changes.game.players.filter(
-        (p) => now - (p.lastSeenAt || 0) < TIMEOUTS.ONLINE_THRESHOLD,
-      );
-      this.pollingState.activePlayerCount = activePlayers.length;
+    // Always update active player count if provided
+    if (typeof activePlayerCount === "number") {
+      const prevCount = this.pollingState.activePlayerCount;
+      this.pollingState.activePlayerCount = activePlayerCount;
+      if (prevCount !== activePlayerCount) {
+        console.log(
+          `[SyncManager] Player count updated: ${prevCount} -> ${activePlayerCount}`,
+        );
+      }
+    } else {
+      // Fallback: calculate from players data if available
+      if (changes?.players) {
+        const now = Date.now();
+        const activePlayers = changes.players.filter(
+          (p) => now - (p.lastSeenAt || 0) < TIMEOUTS.ONLINE_THRESHOLD,
+        );
+        this.pollingState.activePlayerCount = activePlayers.length;
+      } else if (changes?.fullUpdate && changes.game?.players) {
+        const now = Date.now();
+        const activePlayers = changes.game.players.filter(
+          (p) => now - (p.lastSeenAt || 0) < TIMEOUTS.ONLINE_THRESHOLD,
+        );
+        this.pollingState.activePlayerCount = activePlayers.length;
+      }
     }
 
     if (version && version !== this.pollingState.lastVersion) {
