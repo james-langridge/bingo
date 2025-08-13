@@ -3,79 +3,44 @@ import { useGameStore } from "../stores/gameStore";
 
 export function ConnectionStatus() {
   const { isConnected, playerState, currentGame } = useGameStore();
-  const [showReconnecting, setShowReconnecting] = useState(false);
-  const [reconnectAttempts, setReconnectAttempts] = useState(0);
-  const [timeSinceSync, setTimeSinceSync] = useState<string>("");
-
-  // Update time since last sync
-  useEffect(() => {
-    const updateTimeSinceSync = () => {
-      if (!currentGame?.lastModifiedAt) {
-        setTimeSinceSync("");
-        return;
-      }
-
-      const seconds = Math.floor(
-        (Date.now() - currentGame.lastModifiedAt) / 1000,
-      );
-      if (seconds < 60) {
-        setTimeSinceSync(`${seconds}s ago`);
-      } else {
-        const minutes = Math.floor(seconds / 60);
-        setTimeSinceSync(`${minutes}m ago`);
-      }
-    };
-
-    updateTimeSinceSync();
-    const interval = setInterval(updateTimeSinceSync, 1000);
-    return () => clearInterval(interval);
-  }, [currentGame?.lastModifiedAt]);
+  const [showStatus, setShowStatus] = useState(false);
 
   useEffect(() => {
-    let timeout: number;
+    // Only show status briefly when connection state changes
     if (!isConnected) {
-      // Show reconnecting message after 2 seconds of disconnection
-      timeout = window.setTimeout(() => {
-        setShowReconnecting(true);
-        setReconnectAttempts((prev) => prev + 1);
-      }, 2000);
+      setShowStatus(true);
     } else {
-      setShowReconnecting(false);
-      setReconnectAttempts(0);
+      // Hide the "connected" status after 3 seconds
+      setShowStatus(true);
+      const timeout = setTimeout(() => setShowStatus(false), 3000);
+      return () => clearTimeout(timeout);
     }
-    return () => clearTimeout(timeout);
   }, [isConnected]);
 
   // Only show sync status if:
   // 1. Player has joined the game (has playerState)
   // 2. Game has been started (has items)
-  // 3. Game has been synced at least once (has lastModifiedAt)
-  if (
-    !currentGame ||
-    !playerState ||
-    currentGame.items.length === 0 ||
-    !currentGame.lastModifiedAt
-  ) {
+  if (!currentGame || !playerState || currentGame.items.length === 0) {
     return null;
   }
 
-  // Don't show anything if connected and working normally
-  if (isConnected && !showReconnecting) {
+  // Show connected status briefly after reconnection
+  if (isConnected && showStatus) {
     return (
       <div className="fixed top-4 right-4 z-50">
-        <div className="flex items-center gap-2 bg-green-100 text-green-700 px-3 py-1.5 rounded-full shadow-sm">
+        <div className="flex items-center gap-2 bg-green-100 text-green-700 px-3 py-1.5 rounded-full shadow-sm transition-opacity duration-500">
           <span className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
           </span>
-          <span className="text-xs font-medium">Synced {timeSinceSync}</span>
+          <span className="text-xs font-medium">Connected</span>
         </div>
       </div>
     );
   }
 
   // Show disconnected/reconnecting status
-  if (!isConnected || showReconnecting) {
+  if (!isConnected) {
     return (
       <div className="fixed top-4 right-4 z-50">
         <div className="flex items-center gap-2 bg-yellow-100 text-yellow-700 px-3 py-1.5 rounded-full shadow-sm">
@@ -94,11 +59,7 @@ export function ConnectionStatus() {
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
             />
           </svg>
-          <span className="text-xs font-medium">
-            {reconnectAttempts > 3
-              ? `Offline ${timeSinceSync ? `(${timeSinceSync})` : ""}`
-              : "Reconnecting..."}
-          </span>
+          <span className="text-xs font-medium">Reconnecting...</span>
         </div>
       </div>
     );
