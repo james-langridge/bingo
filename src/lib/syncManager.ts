@@ -1,10 +1,16 @@
-import type { Game, PlayerState, Player, WinnerInfo, BingoItem } from "../types/types";
+import type {
+  Game,
+  PlayerState,
+  Player,
+  WinnerInfo,
+  BingoItem,
+} from "../types/types";
 import { POLLING } from "./constants";
 
 /**
  * SyncManager handles real-time synchronization of game state
  * using smart polling with adaptive intervals.
- * 
+ *
  * Note: SSE (Server-Sent Events) doesn't work on Vercel due to function
  * timeout limits (10 seconds for hobby, 60 seconds for pro). Instead,
  * we use intelligent polling that adjusts based on activity.
@@ -37,7 +43,7 @@ class SyncManager {
     lastVersion: "",
     consecutiveErrors: 0,
   };
-  
+
   private visibilityHandler: (() => void) | null = null;
   private isDocumentVisible: boolean = true;
 
@@ -53,13 +59,13 @@ class SyncManager {
     this.visibilityHandler = () => {
       const wasVisible = this.isDocumentVisible;
       this.isDocumentVisible = !document.hidden;
-      
+
       if (!wasVisible && this.isDocumentVisible && this.gameCode) {
         this.pollNow();
       } else if (!this.isDocumentVisible) {
       }
     };
-    
+
     document.addEventListener("visibilitychange", this.visibilityHandler);
   }
 
@@ -68,10 +74,10 @@ class SyncManager {
    */
   connect(gameCode: string) {
     this.disconnect();
-    
+
     this.gameCode = gameCode;
     this.pollingState.lastActivityTime = Date.now();
-    
+
     this.startPolling();
   }
 
@@ -81,19 +87,19 @@ class SyncManager {
   private calculateInterval(): number {
     const now = Date.now();
     const timeSinceActivity = now - this.pollingState.lastActivityTime;
-    
+
     if (!this.isDocumentVisible) {
       return POLLING.INACTIVE;
     }
-    
+
     if (timeSinceActivity < POLLING.IDLE_THRESHOLD) {
       return POLLING.ACTIVE;
     }
-    
+
     if (timeSinceActivity < POLLING.INACTIVE_THRESHOLD) {
       return POLLING.IDLE;
     }
-    
+
     return POLLING.INACTIVE;
   }
 
@@ -104,33 +110,35 @@ class SyncManager {
     if (!this.gameCode || !this.isDocumentVisible) {
       return;
     }
-    
+
     try {
       const params = new URLSearchParams({
         since: (this.pollingState.lastSyncTime || 0).toString(),
         version: this.pollingState.lastVersion || "",
       });
-      
-      const response = await fetch(`/api/game/changes/${this.gameCode}?${params}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
+
+      const response = await fetch(
+        `/api/game/changes/${this.gameCode}?${params}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
         },
-      });
-      
+      );
+
       if (response.status === 304) {
         this.handleSuccessfulPoll();
         return;
       }
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-      
+
       const data = await response.json();
       this.handlePollResponse(data);
       this.handleSuccessfulPoll();
-      
     } catch (error) {
       this.handlePollError(error);
     }
@@ -140,10 +148,10 @@ class SyncManager {
    * Handle successful poll response
    */
   private handlePollResponse(data: unknown) {
-    if (!data || typeof data !== 'object') {
+    if (!data || typeof data !== "object") {
       return;
     }
-    
+
     const response = data as {
       version?: string;
       lastModifiedAt?: number;
@@ -156,17 +164,18 @@ class SyncManager {
         items?: readonly BingoItem[];
       };
     };
-    
+
     const { version, lastModifiedAt, changes, timestamp } = response;
-    
+
     if (version && version !== this.pollingState.lastVersion) {
       this.pollingState.lastVersion = version;
-      this.pollingState.lastSyncTime = lastModifiedAt || timestamp || Date.now();
-      
+      this.pollingState.lastSyncTime =
+        lastModifiedAt || timestamp || Date.now();
+
       if (changes) {
         if (changes.fullUpdate && changes.game) {
           this.callbacks.onGameUpdate(changes.game);
-          
+
           if (changes.game.winner && this.callbacks.onWinnerAnnounced) {
             this.callbacks.onWinnerAnnounced(changes.game.winner.displayName);
           }
@@ -189,7 +198,7 @@ class SyncManager {
     if (this.pollingState.consecutiveErrors > 0) {
       this.pollingState.consecutiveErrors = 0;
     }
-    
+
     if (!this.isConnected) {
       this.isConnected = true;
       this.callbacks.onConnectionChange(true);
@@ -201,15 +210,15 @@ class SyncManager {
    */
   private handlePollError(_error: unknown) {
     this.pollingState.consecutiveErrors++;
-    
+
     if (this.pollingState.consecutiveErrors >= 3 && this.isConnected) {
       this.isConnected = false;
       this.callbacks.onConnectionChange(false);
     }
-    
+
     const backoffInterval = Math.min(
       POLLING.ACTIVE * Math.pow(2, this.pollingState.consecutiveErrors),
-      POLLING.INACTIVE
+      POLLING.INACTIVE,
     );
     this.pollingState.interval = backoffInterval;
   }
@@ -219,17 +228,20 @@ class SyncManager {
    */
   private startPolling() {
     this.stopPolling();
-    
+
     const pollAndSchedule = async () => {
       await this.poll();
-      
+
       this.pollingState.interval = this.calculateInterval();
-      
+
       if (this.gameCode) {
-        this.pollingTimer = setTimeout(pollAndSchedule, this.pollingState.interval);
+        this.pollingTimer = setTimeout(
+          pollAndSchedule,
+          this.pollingState.interval,
+        );
       }
     };
-    
+
     pollAndSchedule();
   }
 
@@ -248,7 +260,7 @@ class SyncManager {
    */
   markActivity(immediate: boolean = false) {
     this.pollingState.lastActivityTime = Date.now();
-    
+
     if (immediate && this.gameCode) {
       this.stopPolling();
       setTimeout(() => this.startPolling(), POLLING.IMMEDIATE_DELAY);
@@ -270,7 +282,7 @@ class SyncManager {
   disconnect() {
     this.stopPolling();
     this.gameCode = null;
-    
+
     if (this.isConnected) {
       this.isConnected = false;
       this.callbacks.onConnectionChange(false);
@@ -293,7 +305,7 @@ class SyncManager {
       this.startPolling();
     }
   }
-  
+
   /**
    * Cleanup event listeners
    */
@@ -334,39 +346,41 @@ export function mergeGameStates(local: Game, remote: Game): Game {
 
   const mergedItems = remote.items.map((remoteItem, index) => {
     const localItem = local.items[index];
-    
+
     const baseItem = localItem || remoteItem;
-    
+
     const markedByMap = new Map();
-    
-    remoteItem.markedBy?.forEach(mark => {
+
+    remoteItem.markedBy?.forEach((mark) => {
       markedByMap.set(mark.playerId, mark);
     });
-    
-    localItem?.markedBy?.forEach(mark => {
+
+    localItem?.markedBy?.forEach((mark) => {
       const existing = markedByMap.get(mark.playerId);
       if (!existing || mark.markedAt > existing.markedAt) {
         markedByMap.set(mark.playerId, mark);
       }
     });
-    
+
     return {
       ...baseItem,
       ...remoteItem,
       text: remoteItem.text || baseItem.text,
       position: remoteItem.position ?? baseItem.position,
       id: remoteItem.id || baseItem.id,
-      markedBy: Array.from(markedByMap.values()).sort((a, b) => a.markedAt - b.markedAt),
+      markedBy: Array.from(markedByMap.values()).sort(
+        (a, b) => a.markedAt - b.markedAt,
+      ),
     };
   });
 
   const playerMap = new Map<string, Player>();
-  
-  remote.players?.forEach(player => {
+
+  remote.players?.forEach((player) => {
     playerMap.set(player.displayName, player);
   });
 
-  local.players?.forEach(player => {
+  local.players?.forEach((player) => {
     const existing = playerMap.get(player.displayName);
     if (existing) {
       if (player.lastSeenAt > existing.lastSeenAt) {
@@ -387,7 +401,10 @@ export function mergeGameStates(local: Game, remote: Game): Game {
   };
 }
 
-export function mergePlayerStates(local: PlayerState, remote: PlayerState): PlayerState {
+export function mergePlayerStates(
+  local: PlayerState,
+  remote: PlayerState,
+): PlayerState {
   return {
     ...remote,
     markedPositions: local.markedPositions,

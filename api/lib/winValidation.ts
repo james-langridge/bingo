@@ -10,12 +10,12 @@ export function validateWinningPositions(
   positions: number[],
   gridSize: number,
   requireFullCard: boolean,
-  hasFreeSpace: boolean = true
+  hasFreeSpace: boolean = true,
 ): WinValidationResult {
   const totalCells = gridSize * gridSize;
-  
+
   // Validate position range
-  if (positions.some(pos => pos < 0 || pos >= totalCells)) {
+  if (positions.some((pos) => pos < 0 || pos >= totalCells)) {
     return { isValid: false, reason: "Invalid position values" };
   }
 
@@ -26,16 +26,17 @@ export function validateWinningPositions(
     // For full card, need all positions except possibly the free space
     const expectedCount = hasFreeSpace ? totalCells - 1 : totalCells;
     const centerPos = Math.floor(totalCells / 2);
-    
+
     // If has free space, add center position to marked positions for validation
-    const markedWithFree = hasFreeSpace && !uniquePositions.includes(centerPos)
-      ? [...uniquePositions, centerPos]
-      : uniquePositions;
-    
+    const markedWithFree =
+      hasFreeSpace && !uniquePositions.includes(centerPos)
+        ? [...uniquePositions, centerPos]
+        : uniquePositions;
+
     if (markedWithFree.length === totalCells) {
       return { isValid: true, winType: "fullCard" };
     }
-    
+
     return {
       isValid: false,
       reason: `Full card requires ${expectedCount} positions, got ${uniquePositions.length}`,
@@ -43,15 +44,20 @@ export function validateWinningPositions(
   }
 
   // Check for line wins (row, column, or diagonal)
-  
+
   // Check rows
   for (let row = 0; row < gridSize; row++) {
     const rowPositions = [];
     for (let col = 0; col < gridSize; col++) {
       rowPositions.push(row * gridSize + col);
     }
-    if (rowPositions.every(pos => uniquePositions.includes(pos) || 
-        (hasFreeSpace && pos === Math.floor(totalCells / 2)))) {
+    if (
+      rowPositions.every(
+        (pos) =>
+          uniquePositions.includes(pos) ||
+          (hasFreeSpace && pos === Math.floor(totalCells / 2)),
+      )
+    ) {
       return { isValid: true, winType: "line" };
     }
   }
@@ -62,8 +68,13 @@ export function validateWinningPositions(
     for (let row = 0; row < gridSize; row++) {
       colPositions.push(row * gridSize + col);
     }
-    if (colPositions.every(pos => uniquePositions.includes(pos) ||
-        (hasFreeSpace && pos === Math.floor(totalCells / 2)))) {
+    if (
+      colPositions.every(
+        (pos) =>
+          uniquePositions.includes(pos) ||
+          (hasFreeSpace && pos === Math.floor(totalCells / 2)),
+      )
+    ) {
       return { isValid: true, winType: "line" };
     }
   }
@@ -73,8 +84,13 @@ export function validateWinningPositions(
   for (let i = 0; i < gridSize; i++) {
     diagonal1.push(i * gridSize + i);
   }
-  if (diagonal1.every(pos => uniquePositions.includes(pos) ||
-      (hasFreeSpace && pos === Math.floor(totalCells / 2)))) {
+  if (
+    diagonal1.every(
+      (pos) =>
+        uniquePositions.includes(pos) ||
+        (hasFreeSpace && pos === Math.floor(totalCells / 2)),
+    )
+  ) {
     return { isValid: true, winType: "line" };
   }
 
@@ -83,8 +99,13 @@ export function validateWinningPositions(
   for (let i = 0; i < gridSize; i++) {
     diagonal2.push(i * gridSize + (gridSize - 1 - i));
   }
-  if (diagonal2.every(pos => uniquePositions.includes(pos) ||
-      (hasFreeSpace && pos === Math.floor(totalCells / 2)))) {
+  if (
+    diagonal2.every(
+      (pos) =>
+        uniquePositions.includes(pos) ||
+        (hasFreeSpace && pos === Math.floor(totalCells / 2)),
+    )
+  ) {
     return { isValid: true, winType: "line" };
   }
 
@@ -98,10 +119,10 @@ export function validateWinningPositions(
 export function getWinningLinePositions(
   positions: number[],
   gridSize: number,
-  hasFreeSpace: boolean = true
+  hasFreeSpace: boolean = true,
 ): number[] | null {
   const uniquePositions = [...new Set(positions)];
-  const centerPos = Math.floor(gridSize * gridSize / 2);
+  const centerPos = Math.floor((gridSize * gridSize) / 2);
 
   // Check rows
   for (let row = 0; row < gridSize; row++) {
@@ -109,8 +130,12 @@ export function getWinningLinePositions(
     for (let col = 0; col < gridSize; col++) {
       rowPositions.push(row * gridSize + col);
     }
-    if (rowPositions.every(pos => uniquePositions.includes(pos) || 
-        (hasFreeSpace && pos === centerPos))) {
+    if (
+      rowPositions.every(
+        (pos) =>
+          uniquePositions.includes(pos) || (hasFreeSpace && pos === centerPos),
+      )
+    ) {
       return rowPositions;
     }
   }
@@ -121,8 +146,12 @@ export function getWinningLinePositions(
     for (let row = 0; row < gridSize; row++) {
       colPositions.push(row * gridSize + col);
     }
-    if (colPositions.every(pos => uniquePositions.includes(pos) ||
-        (hasFreeSpace && pos === centerPos))) {
+    if (
+      colPositions.every(
+        (pos) =>
+          uniquePositions.includes(pos) || (hasFreeSpace && pos === centerPos),
+      )
+    ) {
       return colPositions;
     }
   }
@@ -132,8 +161,12 @@ export function getWinningLinePositions(
   for (let i = 0; i < gridSize; i++) {
     diagonal1.push(i * gridSize + i);
   }
-  if (diagonal1.every(pos => uniquePositions.includes(pos) ||
-      (hasFreeSpace && pos === centerPos))) {
+  if (
+    diagonal1.every(
+      (pos) =>
+        uniquePositions.includes(pos) || (hasFreeSpace && pos === centerPos),
+    )
+  ) {
     return diagonal1;
   }
 
@@ -141,8 +174,12 @@ export function getWinningLinePositions(
   for (let i = 0; i < gridSize; i++) {
     diagonal2.push(i * gridSize + (gridSize - 1 - i));
   }
-  if (diagonal2.every(pos => uniquePositions.includes(pos) ||
-      (hasFreeSpace && pos === centerPos))) {
+  if (
+    diagonal2.every(
+      (pos) =>
+        uniquePositions.includes(pos) || (hasFreeSpace && pos === centerPos),
+    )
+  ) {
     return diagonal2;
   }
 

@@ -141,7 +141,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Ensure game has settings
       let finalGame = {
         ...game,
-        settings: game.settings || { gridSize: 5, requireFullCard: false, freeSpace: true }
+        settings: game.settings || {
+          gridSize: 5,
+          requireFullCard: false,
+          freeSpace: true,
+        },
       };
 
       if (existingData) {
@@ -177,7 +181,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             // Preserve winner if it exists
             winner: existing.winner || game.winner,
             // Preserve settings if missing in new game
-            settings: game.settings || existing.settings || { gridSize: 5, requireFullCard: false, freeSpace: true },
+            settings: game.settings ||
+              existing.settings || {
+                gridSize: 5,
+                requireFullCard: false,
+                freeSpace: true,
+              },
             // Use the latest modification timestamp
             lastModifiedAt: Math.max(
               existing.lastModifiedAt,

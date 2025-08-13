@@ -41,7 +41,10 @@ export const WinnerInfoSchema = z.object({
 
 export const GameSchema = z.object({
   id: z.string().uuid(),
-  adminToken: z.string().regex(/^[a-z0-9]{32}$/).optional(),
+  adminToken: z
+    .string()
+    .regex(/^[a-z0-9]{32}$/)
+    .optional(),
   gameCode: z.string().regex(/^[A-HJ-NP-Z2-9]{6}$/),
   title: z.string().min(1).max(100),
   items: z.array(BingoItemSchema),
@@ -107,13 +110,15 @@ export const GameChangesResponseSchema = z.object({
   version: z.string(),
   lastModifiedAt: z.number().positive(),
   timestamp: z.number().positive(),
-  changes: z.object({
-    fullUpdate: z.boolean().optional(),
-    game: GameSchema.optional(),
-    players: z.array(PlayerSchema).optional(),
-    winner: WinnerInfoSchema.optional(),
-    items: z.array(BingoItemSchema).optional(),
-  }).optional(),
+  changes: z
+    .object({
+      fullUpdate: z.boolean().optional(),
+      game: GameSchema.optional(),
+      players: z.array(PlayerSchema).optional(),
+      winner: WinnerInfoSchema.optional(),
+      items: z.array(BingoItemSchema).optional(),
+    })
+    .optional(),
 });
 
 /**

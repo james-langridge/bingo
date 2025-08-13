@@ -2,10 +2,7 @@ import { create } from "zustand";
 import { produce } from "immer";
 import type { WritableDraft } from "immer";
 import type { Game, PlayerState, BingoItem } from "../types/types.ts";
-import {
-  loadPlayerState,
-  saveGameLocal,
-} from "../lib/storage";
+import { loadPlayerState, saveGameLocal } from "../lib/storage";
 import {
   getSyncManager,
   resetSyncManager,
@@ -99,7 +96,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           adminToken: game.adminToken,
           title: game.title,
         });
-      })
+      }),
     );
     return game;
   },
@@ -124,7 +121,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       let playerId = null;
       if (playerState) {
         const existingPlayer = game.players.find(
-          (p) => p.displayName === playerState.displayName
+          (p) => p.displayName === playerState.displayName,
         );
         if (existingPlayer) {
           playerId = existingPlayer.id;
@@ -191,7 +188,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       produce((draft: WritableDraft<GameStore>) => {
         draft.currentGame = updatedGame as WritableDraft<Game>;
         const gameIndex = draft.localGames.findIndex(
-          (g) => g.id === updatedGame.id
+          (g) => g.id === updatedGame.id,
         );
         if (gameIndex >= 0) {
           draft.localGames[gameIndex] = {
@@ -201,7 +198,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
             title: updatedGame.title,
           };
         }
-      })
+      }),
     );
 
     const syncManager = getSyncManager();
@@ -215,20 +212,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     set(
       produce((draft: WritableDraft<GameStore>) => {
-        draft.localGames = draft.localGames.filter(
-          (g) => g.id !== gameId
-        );
+        draft.localGames = draft.localGames.filter((g) => g.id !== gameId);
         if (draft.currentGame?.id === gameId) {
           draft.currentGame = null;
         }
-      })
+      }),
     );
   },
 
   joinGame: async (gameCode, displayName) => {
     const { game, playerState, playerId } = await joinGameAction(
       gameCode,
-      displayName
+      displayName,
     );
 
     set({
@@ -274,24 +269,25 @@ export const useGameStore = create<GameStore>((set, get) => ({
         (draft.playerState.markedPositions as number[]) = updateMarkedPositions(
           marked,
           position,
-          isUnmarking
+          isUnmarking,
         ) as number[];
         (draft.playerState.lastSyncAt as number) = Date.now();
 
         const itemIndex = (draft.currentGame.items as BingoItem[]).findIndex(
-          (item) => item.position === position
+          (item) => item.position === position,
         );
 
         if (itemIndex >= 0) {
           const item = draft.currentGame.items[itemIndex];
-          (draft.currentGame.items as WritableDraft<BingoItem>[])[itemIndex] = toggleItemMark(
-            item,
-            currentPlayerId,
-            playerState.displayName,
-            isUnmarking
-          ) as WritableDraft<BingoItem>;
+          (draft.currentGame.items as WritableDraft<BingoItem>[])[itemIndex] =
+            toggleItemMark(
+              item,
+              currentPlayerId,
+              playerState.displayName,
+              isUnmarking,
+            ) as WritableDraft<BingoItem>;
         }
-      })
+      }),
     );
 
     const updatedState = get();
@@ -306,7 +302,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
               draft.playerState = draft.optimisticState;
               draft.optimisticState = null;
             }
-          })
+          }),
         );
       });
 
@@ -320,7 +316,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         if (!draft.playerState) return;
         draft.playerState.markedPositions = [];
         draft.playerState.lastSyncAt = Date.now();
-      })
+      }),
     );
 
     const { playerState } = get();
@@ -380,12 +376,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
           produce((draft: WritableDraft<GameStore>) => {
             if (result.nearMiss) {
               draft.nearMissInfo = {
-                winnerName: result.nearMiss.winnerName || '',
+                winnerName: result.nearMiss.winnerName || "",
                 timeDifference: result.nearMiss.timeDifference || 0,
                 showNotification: true,
               };
             }
-          })
+          }),
         );
       }
     }
@@ -444,7 +440,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       if (latestGame.items) {
         const maxLength = Math.max(
           latestGame.items.length,
-          currentGame.items?.length || 0
+          currentGame.items?.length || 0,
         );
 
         const mergedItems = [];
@@ -479,7 +475,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         set(
           produce((draft: WritableDraft<GameStore>) => {
             draft.nearMissInfo = null;
-          })
+          }),
         );
       } else {
         if (
@@ -496,7 +492,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                   timeDifference: timeDiff,
                   showNotification: true,
                 };
-              })
+              }),
             );
           }
         }
@@ -540,7 +536,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           if (draft.playerState) {
             draft.playerState.hasWon = true;
           }
-        })
+        }),
       );
     }
   },

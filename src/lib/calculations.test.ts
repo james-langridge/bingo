@@ -80,7 +80,7 @@ describe("checkWinCondition", () => {
     test("returns true only when all squares are marked - various sizes", () => {
       const marked5x5 = Array.from({ length: 25 }, (_, i) => i);
       expect(checkWinCondition(marked5x5, 5)).toBe(true);
-      
+
       const marked7x7 = Array.from({ length: 49 }, (_, i) => i);
       expect(checkWinCondition(marked7x7, 7)).toBe(true);
     });
@@ -98,12 +98,11 @@ describe("checkWinCondition", () => {
     test("always requires full card", () => {
       const partial = [0, 1, 2, 3, 4];
       const full = Array.from({ length: 25 }, (_, i) => i);
-      
+
       expect(checkWinCondition(partial, 5)).toBe(false);
       expect(checkWinCondition(full, 5)).toBe(true);
     });
   });
-
 
   describe("edge cases", () => {
     test("handles empty marked positions", () => {
@@ -199,10 +198,10 @@ describe("generateDummyItems", () => {
   test("generates correct number of items for various grid sizes", () => {
     const items5x5 = generateDummyItems(5);
     expect(items5x5).toHaveLength(25);
-    
+
     const items7x7 = generateDummyItems(7);
     expect(items7x7).toHaveLength(49);
-    
+
     const items2x2 = generateDummyItems(2);
     expect(items2x2).toHaveLength(4);
   });

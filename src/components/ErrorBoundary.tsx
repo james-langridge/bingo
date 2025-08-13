@@ -33,18 +33,20 @@ function logError(error: Error, errorInfo: ErrorInfo | null, context?: string) {
 
   // In development, log to console with full details
   if (import.meta.env.DEV) {
-    console.error('Error:', error);
+    console.error("Error:", error);
   }
 
   // Store error in localStorage for debugging
   try {
-    const errorHistory = JSON.parse(localStorage.getItem('errorHistory') || '[]');
+    const errorHistory = JSON.parse(
+      localStorage.getItem("errorHistory") || "[]",
+    );
     errorHistory.push(errorData);
     // Keep only last N errors
     if (errorHistory.length > STORAGE.ERROR_HISTORY_LIMIT) {
       errorHistory.shift();
     }
-    localStorage.setItem('errorHistory', JSON.stringify(errorHistory));
+    localStorage.setItem("errorHistory", JSON.stringify(errorHistory));
   } catch {
     // Ignore storage errors
   }
@@ -63,7 +65,10 @@ function preserveGameState() {
         playerState: state.playerState,
         timestamp: Date.now(),
       };
-      sessionStorage.setItem('preservedGameState', JSON.stringify(preservedState));
+      sessionStorage.setItem(
+        "preservedGameState",
+        JSON.stringify(preservedState),
+      );
       return true;
     }
   } catch {
@@ -72,7 +77,10 @@ function preserveGameState() {
   return false;
 }
 
-export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+export class ErrorBoundary extends Component<
+  ErrorBoundaryProps,
+  ErrorBoundaryState
+> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = {
@@ -86,8 +94,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
     // Update state so the next render will show the fallback UI
-    return { 
-      hasError: true, 
+    return {
+      hasError: true,
       error,
       lastErrorTime: Date.now(),
     };
@@ -96,12 +104,12 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     // Log the error
     logError(error, errorInfo, this.props.context);
-    
+
     // Preserve game state if in game
     preserveGameState();
-    
+
     // Update error count
-    this.setState(prevState => ({
+    this.setState((prevState) => ({
       errorInfo,
       errorCount: prevState.errorCount + 1,
     }));
@@ -147,13 +155,18 @@ interface ErrorFallbackProps {
   context?: string;
 }
 
-function ErrorFallback({ error, errorInfo, reset, context }: ErrorFallbackProps) {
+function ErrorFallback({
+  error,
+  errorInfo,
+  reset,
+  context,
+}: ErrorFallbackProps) {
   const isDev = import.meta.env.DEV;
-  
+
   const handleGoHome = () => {
     // Clear preserved state and go home
-    sessionStorage.removeItem('preservedGameState');
-    window.location.href = '/';
+    sessionStorage.removeItem("preservedGameState");
+    window.location.href = "/";
   };
 
   const handleRefresh = () => {
@@ -163,13 +176,13 @@ function ErrorFallback({ error, errorInfo, reset, context }: ErrorFallbackProps)
   const handleRecover = async () => {
     // Try to recover preserved state
     try {
-      const preserved = sessionStorage.getItem('preservedGameState');
+      const preserved = sessionStorage.getItem("preservedGameState");
       if (preserved) {
         const state = JSON.parse(preserved);
         // Check if state is recent
         if (Date.now() - state.timestamp < TIMEOUTS.RECOVERY_WINDOW) {
           // Store for recovery after reset
-          localStorage.setItem('recoveryState', preserved);
+          localStorage.setItem("recoveryState", preserved);
         }
       }
     } catch {
@@ -198,19 +211,19 @@ function ErrorFallback({ error, errorInfo, reset, context }: ErrorFallbackProps)
               />
             </svg>
           </div>
-          
+
           <h1 className="text-2xl font-bold text-gray-800 mb-2">
             Oops! Something went wrong
           </h1>
-          
+
           <p className="text-gray-600 mb-6">
-            {context === 'GameBoard' 
+            {context === "GameBoard"
               ? "The game board had a hiccup! Don't worry, your progress is saved."
-              : context === 'GamePlayer'
-              ? "We couldn't load the game properly. Let's try again!"
-              : context === 'GameEditor'
-              ? "There was a problem saving your changes. Your game is safe!"
-              : "Something unexpected happened, but we can fix it!"}
+              : context === "GamePlayer"
+                ? "We couldn't load the game properly. Let's try again!"
+                : context === "GameEditor"
+                  ? "There was a problem saving your changes. Your game is safe!"
+                  : "Something unexpected happened, but we can fix it!"}
           </p>
         </div>
 
@@ -246,14 +259,14 @@ function ErrorFallback({ error, errorInfo, reset, context }: ErrorFallbackProps)
           >
             Try Again
           </button>
-          
+
           <button
             onClick={handleRefresh}
             className="w-full px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all font-medium"
           >
             Refresh Page
           </button>
-          
+
           <button
             onClick={handleGoHome}
             className="w-full px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-all font-medium"
@@ -265,8 +278,8 @@ function ErrorFallback({ error, errorInfo, reset, context }: ErrorFallbackProps)
         {/* Kid-friendly message */}
         <div className="mt-6 p-4 bg-purple-50 rounded-lg">
           <p className="text-sm text-purple-700 text-center">
-            💜 Don't worry! Bugs happen sometimes. Just like in a real game, 
-            we can start fresh or continue where we left off!
+            💜 Don't worry! Bugs happen sometimes. Just like in a real game, we
+            can start fresh or continue where we left off!
           </p>
         </div>
       </div>
@@ -275,12 +288,14 @@ function ErrorFallback({ error, errorInfo, reset, context }: ErrorFallbackProps)
 }
 
 // Wrapper component for routes that handles navigation hooks
-export function ErrorBoundaryWithRouter({ children, context }: { children: ReactNode; context?: string }) {
-  return (
-    <ErrorBoundary context={context}>
-      {children}
-    </ErrorBoundary>
-  );
+export function ErrorBoundaryWithRouter({
+  children,
+  context,
+}: {
+  children: ReactNode;
+  context?: string;
+}) {
+  return <ErrorBoundary context={context}>{children}</ErrorBoundary>;
 }
 
 // Game-specific error boundary with auto-recovery attempt
@@ -297,7 +312,13 @@ export function GameErrorBoundary({ children }: { children: ReactNode }) {
   );
 }
 
-function GameErrorFallback({ error, reset }: { error: Error; reset: () => void }) {
+function GameErrorFallback({
+  error,
+  reset,
+}: {
+  error: Error;
+  reset: () => void;
+}) {
   const handleRejoinGame = async () => {
     try {
       // Try to get game code from URL or storage
@@ -309,17 +330,18 @@ function GameErrorFallback({ error, reset }: { error: Error; reset: () => void }
         await store.loadGame(gameCode);
         reset();
       } else {
-        window.location.href = '/';
+        window.location.href = "/";
       }
     } catch {
-      window.location.href = '/';
+      window.location.href = "/";
     }
   };
 
   // Check if this is actually a connection error
-  const isConnectionError = error.message?.toLowerCase().includes('fetch') || 
-                          error.message?.toLowerCase().includes('network') ||
-                          error.message?.toLowerCase().includes('connection');
+  const isConnectionError =
+    error.message?.toLowerCase().includes("fetch") ||
+    error.message?.toLowerCase().includes("network") ||
+    error.message?.toLowerCase().includes("connection");
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 flex items-center justify-center p-4">
@@ -339,13 +361,13 @@ function GameErrorFallback({ error, reset }: { error: Error; reset: () => void }
             />
           </svg>
         </div>
-        
+
         <h2 className="text-2xl font-bold text-gray-800 mb-2">
           {isConnectionError ? "Game Connection Lost" : "Something Went Wrong"}
         </h2>
-        
+
         <p className="text-gray-600 mb-6">
-          {isConnectionError 
+          {isConnectionError
             ? "Don't worry! Your game is still there. Let's reconnect!"
             : "We encountered an issue loading the game. Let's try again!"}
         </p>
@@ -353,13 +375,15 @@ function GameErrorFallback({ error, reset }: { error: Error; reset: () => void }
         {/* Show error details in development */}
         {import.meta.env.DEV && (
           <details className="mb-4 text-left">
-            <summary className="cursor-pointer text-sm text-gray-500">Error details</summary>
+            <summary className="cursor-pointer text-sm text-gray-500">
+              Error details
+            </summary>
             <pre className="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded overflow-auto">
               {error.message}
             </pre>
           </details>
         )}
-        
+
         <div className="space-y-3">
           <button
             onClick={handleRejoinGame}
@@ -367,9 +391,9 @@ function GameErrorFallback({ error, reset }: { error: Error; reset: () => void }
           >
             {isConnectionError ? "Rejoin Game" : "Try Again"}
           </button>
-          
+
           <button
-            onClick={() => window.location.href = '/'}
+            onClick={() => (window.location.href = "/")}
             className="w-full px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-all font-medium"
           >
             Back to Home

@@ -22,7 +22,10 @@ vi.mock("../stores/gameStore", () => ({
 }));
 
 // Component that throws an error
-class ThrowError extends Component<{ shouldThrow: boolean; children?: ReactNode }> {
+class ThrowError extends Component<{
+  shouldThrow: boolean;
+  children?: ReactNode;
+}> {
   render() {
     if (this.props.shouldThrow) {
       throw new Error("Test error message");
@@ -48,14 +51,14 @@ describe("ErrorBoundary", () => {
     consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     consoleGroupSpy = vi.spyOn(console, "group").mockImplementation(() => {});
     vi.spyOn(console, "groupEnd").mockImplementation(() => {});
-    
+
     // Clear localStorage before each test
     localStorage.clear();
     sessionStorage.clear();
-    
+
     // Mock window.location
-    Object.defineProperty(window, 'location', {
-      value: { 
+    Object.defineProperty(window, "location", {
+      value: {
         href: "http://localhost:3000/game/ABC123",
         pathname: "/game/ABC123",
         reload: vi.fn(),
@@ -75,80 +78,96 @@ describe("ErrorBoundary", () => {
       render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
-      expect(screen.getByText(/Oops! Something went wrong/i)).toBeInTheDocument();
-      expect(screen.getByText(/Something unexpected happened/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Oops! Something went wrong/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/Something unexpected happened/i),
+      ).toBeInTheDocument();
     });
 
     it("should display normal content when no error", () => {
       render(
         <ErrorBoundary>
           <ThrowError shouldThrow={false} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       expect(screen.getByText("No error")).toBeInTheDocument();
-      expect(screen.queryByText(/Oops! Something went wrong/i)).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/Oops! Something went wrong/i),
+      ).not.toBeInTheDocument();
     });
 
     it("should catch errors from functional components", () => {
       render(
         <ErrorBoundary>
           <ThrowErrorFunctional shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
-      expect(screen.getByText(/Oops! Something went wrong/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Oops! Something went wrong/i),
+      ).toBeInTheDocument();
     });
 
     it("should use context-specific error messages", () => {
       render(
         <ErrorBoundary context="GameBoard">
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
-      expect(screen.getByText(/The game board had a hiccup/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/The game board had a hiccup/i),
+      ).toBeInTheDocument();
     });
 
     it("should display GamePlayer-specific message", () => {
       render(
         <ErrorBoundary context="GamePlayer">
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
-      expect(screen.getByText(/couldn't load the game properly/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/couldn't load the game properly/i),
+      ).toBeInTheDocument();
     });
 
     it("should display GameEditor-specific message", () => {
       render(
         <ErrorBoundary context="GameEditor">
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
-      expect(screen.getByText(/problem saving your changes/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/problem saving your changes/i),
+      ).toBeInTheDocument();
     });
   });
 
   describe("Error Recovery", () => {
     it("should reset error state when Try Again is clicked", async () => {
       let shouldThrow = true;
-      
+
       const TestComponent = () => {
         return <ThrowError shouldThrow={shouldThrow} />;
       };
-      
+
       render(
         <ErrorBoundary>
           <TestComponent />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
-      expect(screen.getByText(/Oops! Something went wrong/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Oops! Something went wrong/i),
+      ).toBeInTheDocument();
 
       // Update the flag and click Try Again
       shouldThrow = false;
@@ -156,7 +175,9 @@ describe("ErrorBoundary", () => {
 
       // Component should re-render without error after reset
       await waitFor(() => {
-        expect(screen.queryByText(/Oops! Something went wrong/i)).not.toBeInTheDocument();
+        expect(
+          screen.queryByText(/Oops! Something went wrong/i),
+        ).not.toBeInTheDocument();
         expect(screen.getByText("No error")).toBeInTheDocument();
       });
     });
@@ -165,7 +186,7 @@ describe("ErrorBoundary", () => {
       render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       fireEvent.click(screen.getByText("Refresh Page"));
@@ -176,7 +197,7 @@ describe("ErrorBoundary", () => {
       render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       fireEvent.click(screen.getByText("Go Home"));
@@ -190,15 +211,15 @@ describe("ErrorBoundary", () => {
       render(
         <ErrorBoundary context="TestContext">
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       expect(consoleErrorSpy).toHaveBeenCalled();
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         "Error:",
         expect.objectContaining({
-          message: "Test error message"
-        })
+          message: "Test error message",
+        }),
       );
     });
 
@@ -206,10 +227,12 @@ describe("ErrorBoundary", () => {
       render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
-      const errorHistory = JSON.parse(localStorage.getItem("errorHistory") || "[]");
+      const errorHistory = JSON.parse(
+        localStorage.getItem("errorHistory") || "[]",
+      );
       expect(errorHistory).toHaveLength(1);
       expect(errorHistory[0]).toMatchObject({
         message: "Test error message",
@@ -228,10 +251,12 @@ describe("ErrorBoundary", () => {
       render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
-      const errorHistory = JSON.parse(localStorage.getItem("errorHistory") || "[]");
+      const errorHistory = JSON.parse(
+        localStorage.getItem("errorHistory") || "[]",
+      );
       expect(errorHistory).toHaveLength(10);
       expect(errorHistory[0].message).toBe("Old error 1"); // First old error removed
       expect(errorHistory[9].message).toBe("Test error message"); // New error added
@@ -246,19 +271,19 @@ describe("ErrorBoundary", () => {
           getState: vi.fn(() => ({
             currentGame: { gameCode: "TEST123", title: "Test Game" },
             playerState: { displayName: "Player1", markedPositions: [1, 2, 3] },
-          }))
-        }
+          })),
+        },
       }));
 
       render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       const preserved = sessionStorage.getItem("preservedGameState");
       expect(preserved).toBeTruthy();
-      
+
       const state = JSON.parse(preserved!);
       expect(state.currentGame.gameCode).toBe("TEST123");
       expect(state.playerState.displayName).toBe("Player1");
@@ -271,12 +296,15 @@ describe("ErrorBoundary", () => {
         playerState: { displayName: "SavedPlayer" },
         timestamp: Date.now(),
       };
-      sessionStorage.setItem("preservedGameState", JSON.stringify(preservedState));
+      sessionStorage.setItem(
+        "preservedGameState",
+        JSON.stringify(preservedState),
+      );
 
       render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       // Click Try Again
@@ -300,7 +328,7 @@ describe("ErrorBoundary", () => {
       render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       fireEvent.click(screen.getByText("Try Again"));
@@ -323,7 +351,7 @@ describe("ErrorBoundary", () => {
       render(
         <ErrorBoundary fallback={customFallback}>
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       expect(screen.getByText("Custom Error")).toBeInTheDocument();
@@ -335,7 +363,11 @@ describe("ErrorBoundary", () => {
   describe("GameErrorBoundary", () => {
     it("should display game-specific error UI", () => {
       // Create a connection error to trigger the connection-specific UI
-      const ThrowConnectionError = ({ shouldThrow }: { shouldThrow: boolean }) => {
+      const ThrowConnectionError = ({
+        shouldThrow,
+      }: {
+        shouldThrow: boolean;
+      }) => {
         if (shouldThrow) {
           throw new Error("Network fetch failed");
         }
@@ -347,7 +379,7 @@ describe("ErrorBoundary", () => {
           <GameErrorBoundary>
             <ThrowConnectionError shouldThrow={true} />
           </GameErrorBoundary>
-        </BrowserRouter>
+        </BrowserRouter>,
       );
 
       expect(screen.getByText("Game Connection Lost")).toBeInTheDocument();
@@ -356,14 +388,14 @@ describe("ErrorBoundary", () => {
 
     it.skip("should attempt to rejoin game from URL", async () => {
       const loadGameMock = vi.fn();
-      
+
       // Mock the useGameStore module
       vi.doMock("../stores/gameStore", () => ({
         useGameStore: {
           getState: vi.fn(() => ({
             loadGame: loadGameMock,
-          }))
-        }
+          })),
+        },
       }));
 
       window.location.pathname = "/game/ABC123";
@@ -373,7 +405,7 @@ describe("ErrorBoundary", () => {
           <GameErrorBoundary>
             <ThrowError shouldThrow={true} />
           </GameErrorBoundary>
-        </BrowserRouter>
+        </BrowserRouter>,
       );
 
       fireEvent.click(screen.getByText("Rejoin Game"));
@@ -391,7 +423,7 @@ describe("ErrorBoundary", () => {
           <GameErrorBoundary>
             <ThrowError shouldThrow={true} />
           </GameErrorBoundary>
-        </BrowserRouter>
+        </BrowserRouter>,
       );
 
       // When there's no game code, the button says "Try Again" not "Rejoin Game"
@@ -405,23 +437,27 @@ describe("ErrorBoundary", () => {
       const { rerender } = render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       // First error
-      expect(screen.getByText(/Oops! Something went wrong/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Oops! Something went wrong/i),
+      ).toBeInTheDocument();
 
       // Reset and trigger another error
       fireEvent.click(screen.getByText("Try Again"));
-      
+
       rerender(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       // Should still show error UI
-      expect(screen.getByText(/Oops! Something went wrong/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Oops! Something went wrong/i),
+      ).toBeInTheDocument();
     });
 
     it("should handle errors during error handling gracefully", () => {
@@ -436,11 +472,13 @@ describe("ErrorBoundary", () => {
         render(
           <ErrorBoundary>
             <ThrowError shouldThrow={true} />
-          </ErrorBoundary>
+          </ErrorBoundary>,
         );
       }).not.toThrow();
 
-      expect(screen.getByText(/Oops! Something went wrong/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Oops! Something went wrong/i),
+      ).toBeInTheDocument();
 
       Storage.prototype.setItem = originalSetItem;
     });
@@ -452,10 +490,12 @@ describe("ErrorBoundary", () => {
       render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
-      expect(screen.getByText("Error Details (Development Mode)")).toBeInTheDocument();
+      expect(
+        screen.getByText("Error Details (Development Mode)"),
+      ).toBeInTheDocument();
       expect(screen.getByText("Test error message")).toBeInTheDocument();
     });
 
@@ -465,11 +505,13 @@ describe("ErrorBoundary", () => {
       render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       // In test environment, DEV is true, so details should show
-      const detailsElement = screen.queryByText("Error Details (Development Mode)");
+      const detailsElement = screen.queryByText(
+        "Error Details (Development Mode)",
+      );
       if (import.meta.env.DEV) {
         expect(detailsElement).toBeInTheDocument();
       } else {
@@ -483,7 +525,7 @@ describe("ErrorBoundary", () => {
       render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       expect(screen.getByText(/Bugs happen sometimes/i)).toBeInTheDocument();

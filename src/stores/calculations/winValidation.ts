@@ -5,7 +5,7 @@ import type { PlayerState, Game, WinnerInfo } from "../../types/types";
  */
 export function checkWinCondition(
   playerState: PlayerState,
-  game: Game
+  game: Game,
 ): boolean {
   if (playerState.hasWon) {
     return true;
@@ -26,7 +26,7 @@ export function createWinnerInfo(
   playerId: string,
   displayName: string,
   game: Game,
-  markedPositions: readonly number[]
+  markedPositions: readonly number[],
 ): WinnerInfo & { winningPositions?: readonly number[] } {
   return {
     playerId,
@@ -42,7 +42,7 @@ export function createWinnerInfo(
  */
 export function isNearMiss(
   timeDifference: number,
-  nearMissWindow: number
+  nearMissWindow: number,
 ): boolean {
   return timeDifference < nearMissWindow;
 }

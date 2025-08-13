@@ -1,9 +1,9 @@
 import type { Game, PlayerState } from "../../types/types";
 import { saveGameLocal, savePlayerState } from "../../lib/storage";
-import { 
-  checkWinCondition, 
+import {
+  checkWinCondition,
   createWinnerInfo,
-  isNearMiss as checkNearMiss 
+  isNearMiss as checkNearMiss,
 } from "../calculations/winValidation";
 import { markPlayerAsWinner } from "../calculations/gameCalculations";
 import { getSyncManager } from "../../lib/syncManager";
@@ -23,7 +23,7 @@ interface WinClaimResult {
  */
 export async function checkForWinner(
   game: Game,
-  playerState: PlayerState
+  playerState: PlayerState,
 ): Promise<boolean> {
   if (!checkWinCondition(playerState, game)) {
     return false;
@@ -47,7 +47,7 @@ export async function checkForWinner(
 export async function claimWin(
   game: Game,
   playerState: PlayerState,
-  playerId: string
+  playerId: string,
 ): Promise<WinClaimResult> {
   const syncManager = getSyncManager();
   if (syncManager) {
@@ -61,8 +61,7 @@ export async function claimWin(
       if (response.ok) {
         latestGame = await response.json();
       }
-    } catch (error) {
-    }
+    } catch (error) {}
   }
 
   if (latestGame?.winner) {
@@ -84,7 +83,12 @@ export async function claimWin(
     return { accepted: false, game: latestGame };
   }
 
-  const winner = createWinnerInfo(playerId, playerState.displayName, game, playerState.markedPositions);
+  const winner = createWinnerInfo(
+    playerId,
+    playerState.displayName,
+    game,
+    playerState.markedPositions,
+  );
   const optimisticGame: Game = {
     ...markPlayerAsWinner(game, playerId),
     winner,
@@ -124,8 +128,7 @@ export async function claimWin(
         }
         return { accepted: false, game: result.game };
       }
-    } catch (error) {
-    }
+    } catch (error) {}
   }
 
   return { accepted: true, game: optimisticGame };

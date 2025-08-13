@@ -1,4 +1,13 @@
-import { describe, test, expect, beforeEach, vi, afterEach, beforeAll, afterAll } from "vitest";
+import {
+  describe,
+  test,
+  expect,
+  beforeEach,
+  vi,
+  afterEach,
+  beforeAll,
+  afterAll,
+} from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
 import "fake-indexeddb/auto";
 import { useGameStore } from "./gameStore";
@@ -16,11 +25,11 @@ describe("gameStore", () => {
   beforeAll(() => {
     // Mock fetch globally for all tests
     global.fetch = vi.fn();
-    
+
     // Mock navigator.onLine to be false by default for tests
-    Object.defineProperty(navigator, 'onLine', {
+    Object.defineProperty(navigator, "onLine", {
       writable: true,
-      value: false
+      value: false,
     });
   });
 
@@ -51,13 +60,13 @@ describe("gameStore", () => {
       new Response(JSON.stringify({ success: true }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      })
+      }),
     );
-    
+
     // Set offline by default for tests (to use local storage only)
-    Object.defineProperty(navigator, 'onLine', {
+    Object.defineProperty(navigator, "onLine", {
       writable: true,
-      value: false
+      value: false,
     });
   });
 
@@ -195,7 +204,7 @@ describe("gameStore", () => {
         new Response(null, {
           status: 404,
           statusText: "Not Found",
-        })
+        }),
       );
 
       await act(async () => {
@@ -213,7 +222,7 @@ describe("gameStore", () => {
         new Response(null, {
           status: 404,
           statusText: "Not Found",
-        })
+        }),
       );
 
       await act(async () => {
@@ -460,7 +469,7 @@ describe("gameStore", () => {
         new Response(null, {
           status: 404,
           statusText: "Not Found",
-        })
+        }),
       );
 
       await expect(

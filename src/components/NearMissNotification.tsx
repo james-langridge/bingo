@@ -76,12 +76,13 @@ export function NearMissNotification({
                   </svg>
                 </button>
               </div>
-              
+
               <div className="space-y-2">
                 <p className="text-lg">
-                  <span className="font-semibold">{winnerName}</span> won just before you!
+                  <span className="font-semibold">{winnerName}</span> won just
+                  before you!
                 </p>
-                
+
                 {isVeryClose ? (
                   <div className="bg-white/20 rounded-lg p-3">
                     <p className="text-sm font-medium">

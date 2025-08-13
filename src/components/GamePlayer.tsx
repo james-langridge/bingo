@@ -226,9 +226,10 @@ export function GamePlayer() {
     );
   }
 
-  const hasWon = playerState && currentGame.items
-    ? playerState.markedPositions.length === currentGame.items.length
-    : false;
+  const hasWon =
+    playerState && currentGame.items
+      ? playerState.markedPositions.length === currentGame.items.length
+      : false;
 
   return (
     <div
@@ -345,7 +346,7 @@ export function GamePlayer() {
             />
           )}
 
-          <ErrorBoundary 
+          <ErrorBoundary
             context="GameBoard"
             fallback={(_error, reset) => (
               <div className="bg-red-50 border-2 border-red-200 rounded-xl p-6 text-center">
@@ -378,7 +379,7 @@ export function GamePlayer() {
       </div>
 
       {hasWon && <Celebration />}
-      
+
       {/* Near miss notification */}
       {nearMissInfo?.showNotification && (
         <NearMissNotification

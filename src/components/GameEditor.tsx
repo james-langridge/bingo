@@ -72,7 +72,7 @@ export function GameEditor() {
     const updatedItems = [...items, newItem];
     setItems(updatedItems);
     setNewItemText("");
-    
+
     // Auto-save the items immediately
     setIsSaving(true);
     await updateGameItems(updatedItems);
@@ -81,18 +81,17 @@ export function GameEditor() {
 
   const handleRemoveItem = async (itemId: string) => {
     if (isSaving) return;
-    
+
     const updatedItems = items
       .filter((item) => item.id !== itemId)
       .map((item, index) => ({ ...item, position: index }));
     setItems(updatedItems);
-    
+
     // Auto-save the items immediately
     setIsSaving(true);
     await updateGameItems(updatedItems);
     setIsSaving(false);
   };
-
 
   const handleShareGame = () => {
     setShowShareModal(true);
@@ -178,7 +177,9 @@ export function GameEditor() {
               />
               <button
                 type="submit"
-                disabled={!newItemText.trim() || items.length >= maxItems || isSaving}
+                disabled={
+                  !newItemText.trim() || items.length >= maxItems || isSaving
+                }
                 className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
                 {isSaving ? "Saving..." : "Add Item"}
@@ -211,13 +212,13 @@ export function GameEditor() {
                 ))}
               </div>
             )}
-
           </div>
         </div>
 
         <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-4">
           <p className="text-sm">
-            <strong>Tip:</strong> Add items for your bingo game. Players will see these items randomly arranged on their bingo boards.
+            <strong>Tip:</strong> Add items for your bingo game. Players will
+            see these items randomly arranged on their bingo boards.
           </p>
         </div>
       </div>

@@ -1,7 +1,10 @@
 import { VercelRequest, VercelResponse } from "@vercel/node";
 import { Redis } from "@upstash/redis";
 import pino from "pino";
-import { validateWinningPositions, getWinningLinePositions } from "../../lib/winValidation";
+import {
+  validateWinningPositions,
+  getWinningLinePositions,
+} from "../../lib/winValidation";
 
 // Initialize logger
 const logger = pino({
@@ -94,7 +97,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Use Redis transaction for atomic winner update
     const lockKey = `game:${code}:winner-lock`;
     const gameKey = `game:${code}`;
-    
+
     // Try to acquire a lock (expires in 5 seconds to prevent deadlock)
     const lockAcquired = await redis.set(lockKey, claimData.playerId, {
       nx: true, // Only set if not exists
@@ -112,18 +115,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
       // Fetch current game state
       const gameData = await redis.get(gameKey);
-      
+
       if (!gameData) {
         logger.error({ msg: "Game not found", gameCode: code });
         return res.status(404).json({ error: "Game not found" });
       }
 
-      const game = typeof gameData === "string" ? JSON.parse(gameData) : gameData;
+      const game =
+        typeof gameData === "string" ? JSON.parse(gameData) : gameData;
 
       // Check if game already has a winner
       if (game.winner) {
         const timeDiff = Date.now() - game.winner.wonAt;
-        
+
         logger.info({
           msg: "Game already has a winner",
           gameCode: code,
@@ -161,7 +165,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         claimData.winningPositions,
         game.settings?.gridSize || 5,
         game.settings?.requireFullCard || false,
-        game.settings?.freeSpace !== false // Default to true if not specified
+        game.settings?.freeSpace !== false, // Default to true if not specified
       );
 
       if (!validation.isValid) {
@@ -176,14 +180,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // Log failed attempt for audit
         const auditKey = `game:${code}:win-attempts`;
-        await redis.lpush(auditKey, JSON.stringify({
-          playerId: claimData.playerId,
-          displayName: claimData.displayName,
-          attemptedAt: Date.now(),
-          accepted: false,
-          reason: validation.reason,
-          positions: claimData.winningPositions,
-        }));
+        await redis.lpush(
+          auditKey,
+          JSON.stringify({
+            playerId: claimData.playerId,
+            displayName: claimData.displayName,
+            attemptedAt: Date.now(),
+            accepted: false,
+            reason: validation.reason,
+            positions: claimData.winningPositions,
+          }),
+        );
         await redis.expire(auditKey, 7 * 24 * 60 * 60);
 
         return res.status(400).json({
@@ -197,7 +204,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const winningLine = getWinningLinePositions(
         claimData.winningPositions,
         game.settings?.gridSize || 5,
-        game.settings?.freeSpace !== false
+        game.settings?.freeSpace !== false,
       );
 
       // No winner yet and valid win - this player wins!
@@ -217,11 +224,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         winner: winner,
         lastModifiedAt: serverTimestamp,
         // Update player's hasWon status
-        players: game.players?.map((p: any) =>
-          p.id === claimData.playerId || p.displayName === claimData.displayName
-            ? { ...p, hasWon: true, lastSeenAt: serverTimestamp }
-            : p
-        ) || [],
+        players:
+          game.players?.map((p: any) =>
+            p.id === claimData.playerId ||
+            p.displayName === claimData.displayName
+              ? { ...p, hasWon: true, lastSeenAt: serverTimestamp }
+              : p,
+          ) || [],
       };
 
       // Save updated game atomically
@@ -231,16 +240,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // Log win for audit
       const auditKey = `game:${code}:win-attempts`;
-      await redis.lpush(auditKey, JSON.stringify({
-        playerId: claimData.playerId,
-        displayName: claimData.displayName,
-        attemptedAt: serverTimestamp,
-        clientTimestamp: claimData.clientTimestamp,
-        accepted: true,
-        winType: claimData.winType,
-        winningPositions: claimData.winningPositions,
-      }));
-      
+      await redis.lpush(
+        auditKey,
+        JSON.stringify({
+          playerId: claimData.playerId,
+          displayName: claimData.displayName,
+          attemptedAt: serverTimestamp,
+          clientTimestamp: claimData.clientTimestamp,
+          accepted: true,
+          winType: claimData.winType,
+          winningPositions: claimData.winningPositions,
+        }),
+      );
+
       // Set TTL on audit log
       await redis.expire(auditKey, 7 * 24 * 60 * 60); // 7-day TTL for audit logs
 
@@ -260,14 +272,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         winner: winner,
         message: "Congratulations! You won!",
       });
-
     } finally {
       // Always release the lock
       if (lockAcquired) {
         await redis.del(lockKey);
       }
     }
-
   } catch (error) {
     logger.error({
       msg: "Failed to process win claim",

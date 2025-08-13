@@ -16,6 +16,7 @@ A real-time multiplayer Progressive Web Application (PWA) for creating and playi
 ### Technology Stack
 
 #### Frontend
+
 - **Framework**: React 19 with TypeScript
 - **Build Tool**: Vite 7
 - **State Management**: Zustand with Immer for immutable updates
@@ -25,6 +26,7 @@ A real-time multiplayer Progressive Web Application (PWA) for creating and playi
 - **Routing**: React Router v7
 
 #### Backend
+
 - **Runtime**: Vercel Serverless Functions
 - **Database**: Redis (Upstash) for persistent storage
 - **API**: RESTful endpoints with smart polling
@@ -110,11 +112,13 @@ The application uses Zustand for state management with the following stores:
 ### Storage Architecture
 
 #### Local Storage (IndexedDB via Dexie.js)
+
 - **games**: Complete game objects indexed by gameCode
 - **playerStates**: Player progress and marked squares
 - **pendingEvents**: Offline action queue for sync
 
 #### Server Storage (Redis via Upstash)
+
 - **Game state**: Authoritative game data with atomic operations
 - **Player registry**: Active players and their states
 - **Win validation**: Server-side verification of win claims
@@ -192,7 +196,7 @@ The frontend can run without these variables but will have limited functionality
 Pre-configured templates available for common scenarios:
 
 - Holiday Dinner
-- Road Trip  
+- Road Trip
 - Family Reunion
 - Video Call
 - Birthday Party
@@ -349,6 +353,7 @@ vercel
 ```
 
 Required Vercel environment variables:
+
 - `KV_REST_API_URL`: Upstash Redis REST API URL
 - `KV_REST_API_TOKEN`: Upstash Redis REST API token
 

@@ -16,7 +16,8 @@ const logger = pino({
 });
 
 // Check for Redis credentials
-const hasRedisCredentials = process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN;
+const hasRedisCredentials =
+  process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN;
 
 if (!hasRedisCredentials) {
   logger.error({
@@ -28,15 +29,17 @@ if (!hasRedisCredentials) {
 
 // Initialize Redis with environment variables
 // Vercel automatically sets KV_REST_API_URL and KV_REST_API_TOKEN
-const redis = hasRedisCredentials ? new Redis({
-  url: process.env.KV_REST_API_URL!,
-  token: process.env.KV_REST_API_TOKEN!,
-}) : null;
+const redis = hasRedisCredentials
+  ? new Redis({
+      url: process.env.KV_REST_API_URL!,
+      token: process.env.KV_REST_API_TOKEN!,
+    })
+  : null;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const startTime = Date.now();
   const { code } = req.query;
-  
+
   logger.info({
     msg: "Player API request received",
     method: req.method,
@@ -46,9 +49,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Check Redis connection
   if (!redis) {
     logger.error({ msg: "Redis not configured" });
-    return res.status(503).json({ 
+    return res.status(503).json({
       error: "Storage service not configured",
-      details: "Redis credentials are missing. Please check Vercel environment variables."
+      details:
+        "Redis credentials are missing. Please check Vercel environment variables.",
     });
   }
 
@@ -77,21 +81,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       logger.debug({ msg: "Fetching player state", gameCode: code, playerId });
       const playerState = await redis.get(`player:${code}:${playerId}`);
-      
-      logger.info({ 
-        msg: playerState ? "Player state found" : "Player state not found", 
+
+      logger.info({
+        msg: playerState ? "Player state found" : "Player state not found",
         gameCode: code,
         playerId,
-        duration: Date.now() - startTime 
+        duration: Date.now() - startTime,
       });
       return res.status(200).json(playerState || null);
     } catch (error) {
-      logger.error({ 
-        msg: "Failed to load player state", 
+      logger.error({
+        msg: "Failed to load player state",
         gameCode: code,
         error: error instanceof Error ? error.message : error,
         stack: error instanceof Error ? error.stack : undefined,
-        duration: Date.now() - startTime 
+        duration: Date.now() - startTime,
       });
       return res.status(500).json({ error: "Failed to load player state" });
     }
@@ -100,20 +104,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === "POST") {
     try {
       const playerState = req.body;
-      
-      logger.debug({ 
-        msg: "Saving player state", 
+
+      logger.debug({
+        msg: "Saving player state",
         gameCode: code,
         hasDisplayName: !!playerState?.displayName,
-        hasPlayerId: !!playerState?.playerId 
+        hasPlayerId: !!playerState?.playerId,
       });
 
       if (!playerState || !playerState.displayName) {
-        logger.warn({ 
-          msg: "Invalid player state", 
+        logger.warn({
+          msg: "Invalid player state",
           gameCode: code,
           hasPlayerState: !!playerState,
-          hasDisplayName: !!playerState?.displayName 
+          hasDisplayName: !!playerState?.displayName,
         });
         return res.status(400).json({ error: "Invalid player state" });
       }
@@ -128,22 +132,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         { ex: 7 * 24 * 60 * 60 }, // 7-day TTL
       );
 
-      logger.info({ 
-        msg: isNewPlayer ? "New player created" : "Player state updated", 
+      logger.info({
+        msg: isNewPlayer ? "New player created" : "Player state updated",
         gameCode: code,
         playerId,
         displayName: playerState.displayName,
         ttl: "7 days",
-        duration: Date.now() - startTime 
+        duration: Date.now() - startTime,
       });
       return res.status(200).json({ success: true, playerId });
     } catch (error) {
-      logger.error({ 
-        msg: "Failed to save player state", 
+      logger.error({
+        msg: "Failed to save player state",
         gameCode: code,
         error: error instanceof Error ? error.message : error,
         stack: error instanceof Error ? error.stack : undefined,
-        duration: Date.now() - startTime 
+        duration: Date.now() - startTime,
       });
       return res.status(500).json({ error: "Failed to save player state" });
     }

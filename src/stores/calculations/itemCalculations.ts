@@ -7,11 +7,11 @@ export function toggleItemMark(
   item: BingoItem,
   playerId: string,
   displayName: string,
-  isUnmarking: boolean
+  isUnmarking: boolean,
 ): BingoItem {
   const markedBy = item.markedBy || [];
   const existingMarkIndex = markedBy.findIndex(
-    (mark) => mark.playerId === playerId
+    (mark) => mark.playerId === playerId,
   );
 
   if (isUnmarking && existingMarkIndex >= 0) {
@@ -40,7 +40,7 @@ export function toggleItemMark(
 export function updateMarkedPositions(
   currentPositions: readonly number[],
   position: number,
-  isUnmarking: boolean
+  isUnmarking: boolean,
 ): number[] {
   if (isUnmarking) {
     return currentPositions.filter((pos) => pos !== position);

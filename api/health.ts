@@ -40,15 +40,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         url: process.env.KV_REST_API_URL!,
         token: process.env.KV_REST_API_TOKEN!,
       });
-      
+
       // Try a simple ping operation
       await redis.set("health:check", Date.now(), { ex: 60 });
       const value = await redis.get("health:check");
-      
+
       health.redis.canConnect = !!value;
     } catch (error) {
       health.redis.canConnect = false;
-      health.redis.error = error instanceof Error ? error.message : String(error);
+      health.redis.error =
+        error instanceof Error ? error.message : String(error);
       health.status = "degraded";
     }
   } else {

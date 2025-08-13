@@ -5,7 +5,10 @@ interface WinnerNotificationProps {
   isCurrentPlayer: boolean;
 }
 
-export function WinnerNotification({ winnerName, isCurrentPlayer }: WinnerNotificationProps) {
+export function WinnerNotification({
+  winnerName,
+  isCurrentPlayer,
+}: WinnerNotificationProps) {
   if (isCurrentPlayer) {
     return (
       <motion.div

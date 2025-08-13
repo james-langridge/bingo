@@ -32,13 +32,17 @@ export function updateGameItems(game: Game, items: BingoItem[]): Game {
 /**
  * Add or update a player in the game
  */
-export function upsertPlayer(game: Game, playerId: string, displayName: string): Game {
+export function upsertPlayer(
+  game: Game,
+  playerId: string,
+  displayName: string,
+): Game {
   const existingPlayerIndex = game.players.findIndex(
-    (p) => p.displayName === displayName
+    (p) => p.displayName === displayName,
   );
 
   let updatedPlayers = [...game.players];
-  
+
   if (existingPlayerIndex >= 0) {
     updatedPlayers[existingPlayerIndex] = {
       ...updatedPlayers[existingPlayerIndex],
@@ -69,15 +73,13 @@ export function upsertPlayer(game: Game, playerId: string, displayName: string):
  * Update player activity timestamp
  */
 export function updatePlayerActivity(game: Game, playerId: string): Game {
-  const playerExists = game.players.some(p => p.id === playerId);
+  const playerExists = game.players.some((p) => p.id === playerId);
   if (!playerExists) {
     return game;
   }
 
   const updatedPlayers = game.players.map((p) =>
-    p.id === playerId
-      ? { ...p, lastSeenAt: Date.now(), isOnline: true }
-      : p
+    p.id === playerId ? { ...p, lastSeenAt: Date.now(), isOnline: true } : p,
   );
 
   return {
@@ -94,9 +96,7 @@ export function markPlayerAsWinner(game: Game, playerId: string): Game {
   return {
     ...game,
     players: game.players.map((p) =>
-      p.id === playerId
-        ? { ...p, hasWon: true, lastSeenAt: Date.now() }
-        : p
+      p.id === playerId ? { ...p, hasWon: true, lastSeenAt: Date.now() } : p,
     ),
     lastModifiedAt: Date.now(),
   };

@@ -14,7 +14,7 @@ export function ConnectionStatus() {
         setTimeSinceSync("");
         return;
       }
-      
+
       const seconds = Math.floor((Date.now() - playerState.lastSyncAt) / 1000);
       if (seconds < 60) {
         setTimeSinceSync(`${seconds}s ago`);
@@ -45,7 +45,10 @@ export function ConnectionStatus() {
   }, [isConnected]);
 
   // Don't show if no game is loaded or game has never been synced
-  if (!currentGame || (!playerState?.lastSyncAt && currentGame.items.length === 0)) {
+  if (
+    !currentGame ||
+    (!playerState?.lastSyncAt && currentGame.items.length === 0)
+  ) {
     return null;
   }
 
@@ -58,9 +61,7 @@ export function ConnectionStatus() {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
           </span>
-          <span className="text-xs font-medium">
-            Synced {timeSinceSync}
-          </span>
+          <span className="text-xs font-medium">Synced {timeSinceSync}</span>
         </div>
       </div>
     );
@@ -71,11 +72,7 @@ export function ConnectionStatus() {
     return (
       <div className="fixed top-4 right-4 z-50">
         <div className="flex items-center gap-2 bg-yellow-100 text-yellow-700 px-3 py-1.5 rounded-full shadow-sm">
-          <svg
-            className="w-3 h-3 animate-spin"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
+          <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
             <circle
               className="opacity-25"
               cx="12"
@@ -91,8 +88,8 @@ export function ConnectionStatus() {
             />
           </svg>
           <span className="text-xs font-medium">
-            {reconnectAttempts > 3 
-              ? `Offline ${timeSinceSync ? `(${timeSinceSync})` : ''}` 
+            {reconnectAttempts > 3
+              ? `Offline ${timeSinceSync ? `(${timeSinceSync})` : ""}`
               : "Reconnecting..."}
           </span>
         </div>

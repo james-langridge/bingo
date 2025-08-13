@@ -46,9 +46,9 @@ describe("GameBoard", () => {
       const { container } = render(<GameBoard {...defaultProps} />);
 
       const grid = container.querySelector(".grid");
-      expect(grid).toHaveStyle({ 
+      expect(grid).toHaveStyle({
         gridAutoRows: "minmax(90px, auto)",
-        gridAutoFlow: "dense" 
+        gridAutoFlow: "dense",
       });
     });
 
@@ -65,9 +65,9 @@ describe("GameBoard", () => {
 
       const grid = container.querySelector(".grid");
       // Check that grid has responsive auto-fit columns
-      expect(grid).toHaveStyle({ 
+      expect(grid).toHaveStyle({
         gridAutoRows: "minmax(90px, auto)",
-        gridAutoFlow: "dense" 
+        gridAutoFlow: "dense",
       });
 
       const buttons = screen.getAllByRole("button");
@@ -301,11 +301,22 @@ describe("GameBoard", () => {
     test("applies animation style to marked items", () => {
       // Update the first item to show it's marked by someone
       const itemsWithMarks = [
-        { ...mockItems[0], markedBy: [{ playerId: "1", displayName: "Test", markedAt: Date.now() }] },
-        ...mockItems.slice(1)
+        {
+          ...mockItems[0],
+          markedBy: [
+            { playerId: "1", displayName: "Test", markedAt: Date.now() },
+          ],
+        },
+        ...mockItems.slice(1),
       ];
-      
-      render(<GameBoard {...defaultProps} items={itemsWithMarks} markedPositions={[0]} />);
+
+      render(
+        <GameBoard
+          {...defaultProps}
+          items={itemsWithMarks}
+          markedPositions={[0]}
+        />,
+      );
 
       const button = screen.getAllByRole("button")[0];
       expect(button).toHaveStyle({ animation: "pop 0.3s ease-out" });

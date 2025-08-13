@@ -28,12 +28,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Polling mechanism since Vercel doesn't support true SSE with Redis pub/sub
   // We'll use a polling approach with change detection
   let lastVersion = "";
-  
+
   const pollInterval = setInterval(async () => {
     try {
       const gameData = await redis.get(`game:${code}`);
       if (gameData) {
-        const game = typeof gameData === 'string' ? JSON.parse(gameData) : gameData;
+        const game =
+          typeof gameData === "string" ? JSON.parse(gameData) : gameData;
         const currentVersion = JSON.stringify({
           lastModifiedAt: game.lastModifiedAt,
           playerCount: game.players?.length,
@@ -43,11 +44,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Only send if there's a change
         if (currentVersion !== lastVersion) {
           lastVersion = currentVersion;
-          res.write(`data: ${JSON.stringify({
-            type: "gameUpdate",
-            game: game,
-            timestamp: Date.now(),
-          })}\n\n`);
+          res.write(
+            `data: ${JSON.stringify({
+              type: "gameUpdate",
+              game: game,
+              timestamp: Date.now(),
+            })}\n\n`,
+          );
         }
       }
     } catch (error) {

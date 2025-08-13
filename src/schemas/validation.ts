@@ -5,7 +5,7 @@ import { z } from "zod";
  */
 export function safeValidate<T>(
   schema: z.ZodSchema<T>,
-  data: unknown
+  data: unknown,
 ): { success: true; data: T } | { success: false; error: string } {
   try {
     const validData = schema.parse(data);
@@ -26,7 +26,7 @@ export function safeValidate<T>(
  */
 export function validatePartial<T extends z.ZodRawShape>(
   schema: z.ZodObject<T>,
-  data: unknown
+  data: unknown,
 ) {
   const partialSchema = schema.partial();
   return safeValidate(partialSchema, data);
@@ -51,7 +51,7 @@ export function isValidGameCode(code: string): boolean {
  */
 export function isValidUUID(uuid: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    uuid
+    uuid,
   );
 }
 

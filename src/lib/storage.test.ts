@@ -1,4 +1,13 @@
-import { describe, test, expect, beforeEach, vi, afterEach, beforeAll, afterAll } from "vitest";
+import {
+  describe,
+  test,
+  expect,
+  beforeEach,
+  vi,
+  afterEach,
+  beforeAll,
+  afterAll,
+} from "vitest";
 import "fake-indexeddb/auto";
 import {
   db,
@@ -46,11 +55,11 @@ describe("storage", () => {
   beforeAll(() => {
     // Mock fetch globally for all tests
     global.fetch = vi.fn();
-    
+
     // Mock navigator.onLine to be false by default for tests
-    Object.defineProperty(navigator, 'onLine', {
+    Object.defineProperty(navigator, "onLine", {
       writable: true,
-      value: false
+      value: false,
     });
   });
 
@@ -63,7 +72,7 @@ describe("storage", () => {
     await db.games.clear();
     await db.playerStates.clear();
     await db.pendingEvents.clear();
-    
+
     // Reset fetch mock for each test
     vi.mocked(global.fetch).mockReset();
     // Default to successful responses
@@ -71,13 +80,13 @@ describe("storage", () => {
       new Response(JSON.stringify({ success: true }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      })
+      }),
     );
-    
+
     // Set offline by default for tests
-    Object.defineProperty(navigator, 'onLine', {
+    Object.defineProperty(navigator, "onLine", {
       writable: true,
-      value: false
+      value: false,
     });
   });
 
@@ -104,7 +113,11 @@ describe("storage", () => {
     });
 
     test("handles multiple games", async () => {
-      const game2 = { ...mockGame, id: "550e8400-e29b-41d4-a716-446655440003", gameCode: "DEF456" };
+      const game2 = {
+        ...mockGame,
+        id: "550e8400-e29b-41d4-a716-446655440003",
+        gameCode: "DEF456",
+      };
       await saveGameLocal(mockGame);
       await saveGameLocal(game2);
 
@@ -120,14 +133,22 @@ describe("storage", () => {
     });
 
     test("returns all saved games", async () => {
-      const game2 = { ...mockGame, id: "550e8400-e29b-41d4-a716-446655440004", gameCode: "DEF456" };
+      const game2 = {
+        ...mockGame,
+        id: "550e8400-e29b-41d4-a716-446655440004",
+        gameCode: "DEF456",
+      };
       await saveGameLocal(mockGame);
       await saveGameLocal(game2);
 
       const games = await loadLocalGames();
       expect(games).toHaveLength(2);
-      expect(games.map((g) => g.id)).toContain("550e8400-e29b-41d4-a716-446655440000");
-      expect(games.map((g) => g.id)).toContain("550e8400-e29b-41d4-a716-446655440004");
+      expect(games.map((g) => g.id)).toContain(
+        "550e8400-e29b-41d4-a716-446655440000",
+      );
+      expect(games.map((g) => g.id)).toContain(
+        "550e8400-e29b-41d4-a716-446655440004",
+      );
     });
 
     test("returns games with all properties intact", async () => {
@@ -144,15 +165,15 @@ describe("storage", () => {
         writable: true,
         value: true,
       });
-      
+
       // Mock fetch to return 404 for this test
       vi.mocked(global.fetch).mockResolvedValueOnce(
         new Response(null, {
           status: 404,
           statusText: "Not Found",
-        })
+        }),
       );
-      
+
       const game = await loadGameByCode("NOTFOUND");
       expect(game).toBeUndefined();
     });
@@ -179,21 +200,21 @@ describe("storage", () => {
 
     test("is case sensitive", async () => {
       await saveGameLocal(mockGame);
-      
+
       // Mock online state
       Object.defineProperty(navigator, "onLine", {
         writable: true,
         value: true,
       });
-      
+
       // Mock fetch to return 404 for this test
       vi.mocked(global.fetch).mockResolvedValueOnce(
         new Response(null, {
           status: 404,
           statusText: "Not Found",
-        })
+        }),
       );
-      
+
       const game = await loadGameByCode("abc234");
       expect(game).toBeUndefined();
     });
@@ -240,7 +261,11 @@ describe("storage", () => {
     });
 
     test("only deletes specified game", async () => {
-      const game2 = { ...mockGame, id: "550e8400-e29b-41d4-a716-446655440007", gameCode: "DEF456" };
+      const game2 = {
+        ...mockGame,
+        id: "550e8400-e29b-41d4-a716-446655440007",
+        gameCode: "DEF456",
+      };
       await saveGameLocal(mockGame);
       await saveGameLocal(game2);
 
@@ -479,9 +504,13 @@ describe("storage", () => {
       const promises = [];
       for (let i = 0; i < 10; i++) {
         // Generate valid 6-character game codes using only allowed characters: A-H, J-N, P-Z, 2-9
-        const validChars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        const validChars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
         const gameCode = `TEST${validChars[i]}${validChars[i + 1]}`;
-        const game = { ...mockGame, id: `550e8400-e29b-41d4-a716-44665544000${i}`, gameCode };
+        const game = {
+          ...mockGame,
+          id: `550e8400-e29b-41d4-a716-44665544000${i}`,
+          gameCode,
+        };
         promises.push(saveGameLocal(game));
       }
 

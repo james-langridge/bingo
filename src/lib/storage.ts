@@ -24,13 +24,12 @@ export const db = new BingoDB();
 const syncThrottle = new Map<string, number>();
 
 async function syncGameToServer(game: Game): Promise<boolean> {
-  
   const lastSync = syncThrottle.get(game.gameCode) || 0;
   const timeSinceLastSync = Date.now() - lastSync;
   if (timeSinceLastSync < STORAGE.SYNC_THROTTLE_MS) {
     return false;
   }
-  
+
   try {
     const response = await fetch(`/api/game/${game.gameCode}`, {
       method: "POST",
@@ -66,8 +65,7 @@ async function fetchGameFromServer(gameCode: string): Promise<Game | null> {
         return null;
       }
     }
-  } catch (error) {
-  }
+  } catch (error) {}
   return null;
 }
 
@@ -111,39 +109,38 @@ export async function loadLocalGames(): Promise<Game[]> {
 export async function loadGameByCode(
   gameCode: string,
 ): Promise<Game | undefined> {
-
   let localGame = await db.games.where("gameCode").equals(gameCode).first();
 
   if (navigator.onLine) {
     const serverGame = await fetchGameFromServer(gameCode);
     if (serverGame) {
       let mergedGame = serverGame;
-      
+
       if (localGame) {
         if (localGame.adminToken) {
           mergedGame = { ...serverGame, adminToken: localGame.adminToken };
         }
-        
+
         const playerMap = new Map<string, Player>();
-        
-        serverGame.players?.forEach(player => {
+
+        serverGame.players?.forEach((player) => {
           playerMap.set(player.displayName, player);
         });
-        
-        localGame.players?.forEach(player => {
+
+        localGame.players?.forEach((player) => {
           if (!playerMap.has(player.displayName)) {
             if (Date.now() - player.joinedAt < TIMEOUTS.PLAYER_JOIN_RECENT) {
               playerMap.set(player.displayName, player);
             }
           }
         });
-        
+
         mergedGame = {
           ...mergedGame,
           players: Array.from(playerMap.values()),
         };
       }
-      
+
       await db.games.put(mergedGame);
       return mergedGame;
     } else if (localGame) {

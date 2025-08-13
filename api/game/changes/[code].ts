@@ -22,7 +22,7 @@ function generateGameVersion(game: any): string {
       markedByCount: item.markedBy?.length || 0,
     })),
   };
-  
+
   return crypto
     .createHash("md5")
     .update(JSON.stringify(versionData))
@@ -54,19 +54,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const gameData = await redis.get(`game:${code}`);
-    
+
     if (!gameData) {
       return res.status(404).json({ error: "Game not found" });
     }
 
     const game = typeof gameData === "string" ? JSON.parse(gameData) : gameData;
     const currentVersion = generateGameVersion(game);
-    
+
     // If version matches, nothing has changed
     if (version && version === currentVersion) {
       return res.status(304).end();
     }
-    
+
     // If nothing has changed since the timestamp
     if (since && game.lastModifiedAt && game.lastModifiedAt <= since) {
       return res.status(304).end();
@@ -78,16 +78,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       lastModifiedAt: game.lastModifiedAt || Date.now(),
       changes: {
         // Only send full game if significant changes occurred
-        fullUpdate: !since || since < (game.lastModifiedAt - 60000), // Full update if more than 1 minute behind
-        game: !since || since < (game.lastModifiedAt - 60000) ? game : undefined,
-        
+        fullUpdate: !since || since < game.lastModifiedAt - 60000, // Full update if more than 1 minute behind
+        game: !since || since < game.lastModifiedAt - 60000 ? game : undefined,
+
         // Otherwise send incremental updates
         players: game.players,
         winner: game.winner,
         items: game.items?.map((item: any) => ({
           id: item.id,
-          text: item.text,  // Include text field
-          position: item.position,  // Include position
+          text: item.text, // Include text field
+          position: item.position, // Include position
           markedBy: item.markedBy,
         })),
       },
@@ -97,7 +97,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Set cache headers for efficient polling
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     res.setHeader("ETag", currentVersion);
-    
+
     return res.status(200).json(response);
   } catch (error) {
     console.error("Error fetching game changes:", error);
