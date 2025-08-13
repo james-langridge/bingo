@@ -77,9 +77,12 @@ describe("checkWinCondition", () => {
       expect(checkWinCondition(marked, 5)).toBe(false);
     });
 
-    test("returns true only when all squares are marked - 5x5", () => {
-      const marked = Array.from({ length: 25 }, (_, i) => i);
-      expect(checkWinCondition(marked, 5)).toBe(true);
+    test("returns true only when all squares are marked - various sizes", () => {
+      const marked5x5 = Array.from({ length: 25 }, (_, i) => i);
+      expect(checkWinCondition(marked5x5, 5)).toBe(true);
+      
+      const marked7x7 = Array.from({ length: 49 }, (_, i) => i);
+      expect(checkWinCondition(marked7x7, 7)).toBe(true);
     });
 
     test("returns true only when all squares are marked - 3x3", () => {
@@ -193,9 +196,15 @@ describe("generateDummyItems", () => {
     expect(items).toHaveLength(16);
   });
 
-  test("generates correct number of items for 5x5 grid", () => {
-    const items = generateDummyItems(5);
-    expect(items).toHaveLength(25);
+  test("generates correct number of items for various grid sizes", () => {
+    const items5x5 = generateDummyItems(5);
+    expect(items5x5).toHaveLength(25);
+    
+    const items7x7 = generateDummyItems(7);
+    expect(items7x7).toHaveLength(49);
+    
+    const items2x2 = generateDummyItems(2);
+    expect(items2x2).toHaveLength(4);
   });
 
   test("assigns sequential positions", () => {

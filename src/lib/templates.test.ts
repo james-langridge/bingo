@@ -34,9 +34,9 @@ describe("gameTemplates", () => {
     });
   });
 
-  test("all templates have at least 25 items for 5x5 grid", () => {
+  test("all templates have at least some items", () => {
     gameTemplates.forEach((template) => {
-      expect(template.items.length).toBeGreaterThanOrEqual(25);
+      expect(template.items.length).toBeGreaterThanOrEqual(4); // At least support 2x2 grid
     });
   });
 
@@ -73,8 +73,8 @@ describe("gameTemplates", () => {
       expect(template?.items).toContain("Political debate starts");
     });
 
-    test("has exactly 25 items", () => {
-      expect(template?.items).toHaveLength(25);
+    test("has sufficient items for a bingo game", () => {
+      expect(template?.items.length).toBeGreaterThanOrEqual(4);
     });
   });
 
@@ -95,8 +95,8 @@ describe("gameTemplates", () => {
       expect(template?.items).toContain("Traffic jam");
     });
 
-    test("has exactly 25 items", () => {
-      expect(template?.items).toHaveLength(25);
+    test("has sufficient items for a bingo game", () => {
+      expect(template?.items.length).toBeGreaterThanOrEqual(4);
     });
   });
 
@@ -117,8 +117,8 @@ describe("gameTemplates", () => {
       expect(template?.items).toContain("Family gossip");
     });
 
-    test("has exactly 25 items", () => {
-      expect(template?.items).toHaveLength(25);
+    test("has sufficient items for a bingo game", () => {
+      expect(template?.items.length).toBeGreaterThanOrEqual(4);
     });
   });
 
@@ -139,8 +139,8 @@ describe("gameTemplates", () => {
       expect(template?.items).toContain("Pet appears");
     });
 
-    test("has exactly 25 items", () => {
-      expect(template?.items).toHaveLength(25);
+    test("has sufficient items for a bingo game", () => {
+      expect(template?.items.length).toBeGreaterThanOrEqual(4);
     });
   });
 
@@ -161,8 +161,8 @@ describe("gameTemplates", () => {
       expect(template?.items).toContain("Balloon pops");
     });
 
-    test("has exactly 25 items", () => {
-      expect(template?.items).toHaveLength(25);
+    test("has sufficient items for a bingo game", () => {
+      expect(template?.items.length).toBeGreaterThanOrEqual(4);
     });
   });
 

@@ -31,7 +31,7 @@ export interface SquareMark {
 }
 
 export interface GameSettings {
-  readonly gridSize: 3 | 4 | 5; // NxN grid
+  readonly gridSize: number; // NxN grid - any positive integer
   readonly requireFullCard: boolean;
   readonly freeSpace: boolean; // Center free space
 }
@@ -39,7 +39,7 @@ export interface GameSettings {
 export interface PlayerState {
   readonly gameCode: string;
   readonly displayName: string;
-  readonly markedPositions: readonly number[]; // Grid positions (0-24 for 5x5)
+  readonly markedPositions: readonly number[]; // Grid positions (0-based index)
   readonly lastSyncAt: number;
   readonly hasWon?: boolean; // NEW: Track if this player has won
 }

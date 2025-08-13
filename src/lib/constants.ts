@@ -29,9 +29,9 @@ export const STORAGE = {
 export const GAME_CONFIG = {
   CODE_LENGTH: 6,              // 6 character game codes
   ADMIN_TOKEN_LENGTH: 32,      // 32 character admin tokens
-  DEFAULT_GRID_SIZE: 5,        // 5x5 grid by default
-  MIN_GRID_SIZE: 3,            // Minimum 3x3 grid
-  MAX_GRID_SIZE: 5,            // Maximum 5x5 grid
+  DEFAULT_GRID_SIZE: 5,        // Default grid size
+  MIN_GRID_SIZE: 2,            // Minimum 2x2 grid
+  MAX_GRID_SIZE: 10,           // Maximum 10x10 grid for practical reasons
   ANIMATION_DURATION: 300,     // 300ms for animations
 } as const;
 

@@ -86,7 +86,7 @@ Games are stored with the following properties:
 - **gameCode**: 6-character alphanumeric code for sharing (e.g., "ABC123")
 - **adminToken**: 32-character secret token for administrative access
 - **items**: Array of bingo items with text and position
-- **settings**: Grid size (3x3, 4x4, or 5x5), win conditions, free space option
+- **settings**: Grid size (any NxN), win conditions, free space option
 - **players**: Map of active players with display names and join times
 - **squares**: Multi-person marking support with notes and photos (vacation mode)
 - **winner**: Player who successfully claimed victory

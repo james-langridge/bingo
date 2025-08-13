@@ -133,9 +133,6 @@ export function GameEditor() {
               <p className="text-gray-600">
                 Game Code: <span className="font-mono font-bold">{code}</span>
               </p>
-              <p className="text-sm text-gray-500">
-                Grid Size: {gridSize}x{gridSize}
-              </p>
             </div>
             <div className="flex gap-2">
               <button
@@ -220,9 +217,7 @@ export function GameEditor() {
 
         <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-4">
           <p className="text-sm">
-            <strong>Tip:</strong> Add {maxItems} items to fill your {gridSize}x
-            {gridSize} grid. Players will see these items randomly arranged on
-            their bingo boards.
+            <strong>Tip:</strong> Add items for your bingo game. Players will see these items randomly arranged on their bingo boards.
           </p>
         </div>
       </div>
