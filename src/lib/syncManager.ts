@@ -42,13 +42,6 @@ class SyncManager {
           return;
         }
 
-        // Handle server timeout signal (Vercel function reaching limit)
-        if (data.reconnect) {
-          console.log(`[SyncManager] Server signaled timeout - reconnecting`);
-          // EventSource will auto-reconnect
-          return;
-        }
-
         // Update connection status
         if (!this.isConnected) {
           this.isConnected = true;
@@ -73,14 +66,6 @@ class SyncManager {
         console.error("[SyncManager] Error parsing SSE data:", error);
       }
     };
-
-    // Handle custom events (like timeout)
-    this.eventSource.addEventListener("timeout", (event: any) => {
-      console.log(
-        `[SyncManager] Received timeout event - connection will reconnect`,
-      );
-      // EventSource will auto-reconnect
-    });
 
     // Handle connection errors (automatic reconnection)
     this.eventSource.onerror = () => {

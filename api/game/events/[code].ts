@@ -6,18 +6,6 @@ const redis = new Redis({
   token: process.env.KV_REST_API_TOKEN!,
 });
 
-// Vercel function timeout limits
-const FUNCTION_TIMEOUT = {
-  HOBBY: 9000, // 9 seconds (leaving 1s buffer before 10s limit)
-  PRO: 295000, // 4m 55s (leaving 5s buffer before 5min limit)
-};
-
-// Use Pro timeout if available, otherwise Hobby
-const MAX_RUNTIME =
-  process.env.VERCEL_ENV === "production"
-    ? FUNCTION_TIMEOUT.PRO
-    : FUNCTION_TIMEOUT.HOBBY;
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Only allow GET requests
   if (req.method !== "GET") {
@@ -39,15 +27,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     "X-Accel-Buffering": "no", // Disable Nginx buffering
   });
 
-  // Track timing and state
-  const startTime = Date.now();
+  // Track state
   let lastGameData: string | null = null;
   let lastOnlineCount = 0;
   let pollCount = 0;
-
-  // Adaptive polling intervals based on activity
-  let pollInterval = 500; // Start with 500ms for immediate responsiveness
-  let noChangeCount = 0;
+  let pollInterval = 500; // Start with 500ms
+  let pollTimer: NodeJS.Timeout | null = null;
 
   // Function to check and send updates
   const checkForUpdates = async () => {
@@ -69,101 +54,87 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         game.players?.filter((p: any) => now - (p.lastSeenAt || 0) < 15000)
           .length || 0;
 
-      // Create a version string to detect changes
-      const currentData = JSON.stringify({
-        ...game,
-        onlineCount,
-      });
+      // Intelligent polling based on player count
+      if (onlineCount <= 1) {
+        // 0 or 1 players: No need for real-time sync!
+        // Stop polling entirely - will resume when players join
+        pollInterval = 0;
 
-      // Check if data changed
-      if (currentData !== lastGameData) {
-        res.write(`data: ${currentData}\n\n`);
-        lastGameData = currentData;
-        noChangeCount = 0; // Reset no-change counter
-        pollInterval = 500; // Return to fast polling when changes detected
+        // Still send the update if data changed (for player joining/leaving notifications)
+        const currentData = JSON.stringify({
+          ...game,
+          onlineCount,
+        });
 
-        // Log player count changes for debugging
-        if (onlineCount !== lastOnlineCount) {
-          console.log(
-            `[SSE] Game ${code}: Online players changed ${lastOnlineCount} -> ${onlineCount}`,
-          );
-          lastOnlineCount = onlineCount;
+        if (currentData !== lastGameData) {
+          res.write(`data: ${currentData}\n\n`);
+          lastGameData = currentData;
+
+          if (onlineCount !== lastOnlineCount) {
+            console.log(
+              `[SSE] Game ${code}: ${onlineCount} players online - pausing sync`,
+            );
+            lastOnlineCount = onlineCount;
+          }
         }
+
+        // Schedule a check in 5 seconds to see if more players joined
+        pollTimer = setTimeout(() => checkForUpdates(), 5000);
+        return true;
       } else {
-        noChangeCount++;
+        // 2+ players: Need real-time sync
+        pollInterval = 500; // Fast polling for active games
 
-        // Adaptive polling: slow down if no changes
-        if (noChangeCount > 10 && pollInterval < 2000) {
-          pollInterval = 1000; // After 5 seconds of no changes, slow to 1s
-        } else if (noChangeCount > 30 && pollInterval < 3000) {
-          pollInterval = 2000; // After 30 seconds of no changes, slow to 2s
-        } else if (noChangeCount > 60) {
-          pollInterval = 3000; // After 1 minute of no changes, slow to 3s max
+        // Send updates
+        const currentData = JSON.stringify({
+          ...game,
+          onlineCount,
+        });
+
+        if (currentData !== lastGameData) {
+          res.write(`data: ${currentData}\n\n`);
+          lastGameData = currentData;
+
+          if (onlineCount !== lastOnlineCount) {
+            console.log(
+              `[SSE] Game ${code}: ${onlineCount} players online - active sync`,
+            );
+            lastOnlineCount = onlineCount;
+          }
         }
-      }
 
-      return true; // Continue polling
+        // Continue fast polling
+        pollTimer = setTimeout(() => checkForUpdates(), pollInterval);
+        return true;
+      }
     } catch (error) {
       console.error(`[SSE] Error checking updates for game ${code}:`, error);
-      return true; // Continue despite errors
+      // Continue checking despite errors
+      pollTimer = setTimeout(() => checkForUpdates(), 5000);
+      return true;
     }
   };
 
   // Send initial state immediately
-  const shouldContinue = await checkForUpdates();
-  if (!shouldContinue) {
-    res.end();
-    return;
-  }
+  checkForUpdates();
 
-  // Dynamic polling with timeout awareness
-  const poll = async () => {
-    const elapsed = Date.now() - startTime;
-    const remaining = MAX_RUNTIME - elapsed;
-
-    // Stop polling 2 seconds before timeout to gracefully close
-    if (remaining < 2000) {
-      console.log(
-        `[SSE] Closing connection for game ${code} before timeout. ` +
-          `Polls: ${pollCount}, Runtime: ${elapsed}ms`,
-      );
-
-      // Send a reconnect hint to the client
-      res.write(`event: timeout\ndata: {"reconnect": true}\n\n`);
-      res.end();
-      return;
-    }
-
-    // Check for updates
-    const shouldContinue = await checkForUpdates();
-    if (!shouldContinue) {
-      res.end();
-      return;
-    }
-
-    // Schedule next poll with adaptive interval
-    setTimeout(poll, pollInterval);
-  };
-
-  // Start polling after initial state
-  setTimeout(poll, pollInterval);
-
-  // Send periodic heartbeats (every 30 seconds)
+  // Send periodic heartbeats (every 30 seconds) to keep connection alive
   const heartbeatInterval = setInterval(() => {
-    const elapsed = Date.now() - startTime;
-    if (elapsed < MAX_RUNTIME - 2000) {
-      res.write(`:heartbeat\n\n`);
-    }
+    res.write(`:heartbeat\n\n`);
   }, 30000);
 
   // Cleanup on client disconnect
   req.on("close", () => {
+    if (pollTimer) {
+      clearTimeout(pollTimer);
+    }
     clearInterval(heartbeatInterval);
-    const elapsed = Date.now() - startTime;
     console.log(
-      `[SSE] Client disconnected from game ${code}. ` +
-        `Polls: ${pollCount}, Runtime: ${elapsed}ms, Avg interval: ${Math.round(elapsed / pollCount)}ms`,
+      `[SSE] Client disconnected from game ${code}. Total polls: ${pollCount}`,
     );
     res.end();
   });
+
+  // Let Vercel handle the timeout naturally - client will auto-reconnect
+  // No need for manual timeout handling since EventSource handles it well
 }
