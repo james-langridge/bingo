@@ -84,15 +84,6 @@ class SyncManager {
           return;
         }
 
-        // Handle idle status (server closing connection due to inactivity)
-        if (data.status === "idle") {
-          console.log(
-            `[SyncManager] Server closing due to idle (${data.onlineCount} players online)`,
-          );
-          // The connection will close, and we'll retry periodically
-          return;
-        }
-
         // Update connection status
         if (!this.isConnected) {
           this.isConnected = true;

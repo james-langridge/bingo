@@ -27,3 +27,7 @@ CLAUDE.md
 *.sw?
 coverage/
 .env.local
+
+# Server
+server/node_modules/
+server/.env
