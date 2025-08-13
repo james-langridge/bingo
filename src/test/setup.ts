@@ -42,3 +42,18 @@ global.crypto.randomUUID = () => {
     return v.toString(16);
   }) as `${string}-${string}-${string}-${string}-${string}`;
 };
+
+// Mock EventSource for SSE
+global.EventSource = vi.fn().mockImplementation(() => ({
+  addEventListener: vi.fn(),
+  close: vi.fn(),
+  onmessage: null,
+  onerror: null,
+  onopen: null,
+  readyState: 0,
+  url: "",
+  withCredentials: false,
+  CONNECTING: 0,
+  OPEN: 1,
+  CLOSED: 2,
+})) as any;
