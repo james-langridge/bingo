@@ -79,7 +79,3 @@ npm run dev:server
    - SSE connections persist indefinitely
    - Automatic cleanup when clients disconnect
    - Per-game subscription management
-
-## Production Deployment
-
-See [DEPLOYMENT.md](../DEPLOYMENT.md) for Railway/Fly.io deployment instructions.
