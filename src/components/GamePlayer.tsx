@@ -309,12 +309,6 @@ export function GamePlayer() {
               <p className="text-gray-600">
                 Game Code: <span className="font-mono font-bold">{code}</span>
               </p>
-              <p className="text-sm text-gray-500">
-                Playing as:{" "}
-                <span className="font-semibold">
-                  {playerState?.displayName}
-                </span>
-              </p>
             </div>
             <div className="flex gap-2 mt-2 sm:mt-0">
               <button
