@@ -47,7 +47,7 @@ describe("GameBoard", () => {
 
       const list = container.querySelector(".flex.flex-col");
       expect(list).toBeInTheDocument();
-      expect(list).toHaveClass("flex", "flex-col", "gap-2");
+      expect(list).toHaveClass("flex", "flex-col", "gap-1.5");
     });
 
     test("handles different number of items", () => {
@@ -279,7 +279,7 @@ describe("GameBoard", () => {
       render(<GameBoard {...defaultProps} />);
 
       const button = screen.getAllByRole("button")[0];
-      expect(button.className).toContain("min-h-[80px]");
+      expect(button.className).toContain("min-h-[60px]");
       expect(button.className).toContain("rounded-lg");
       expect(button.className).toContain("font-medium");
     });
