@@ -31,9 +31,11 @@ export function LeaderboardModal({
 
     const fetchPlayerCounts = async () => {
       setLoading(true);
+
       try {
         // Fetch counts for all players
         const response = await fetch(`/api/game/${gameCode}/leaderboard`);
+
         if (response.ok) {
           const data = await response.json();
           setPlayersData(data.players || []);
@@ -181,9 +183,38 @@ export function LeaderboardModal({
                 No players have joined yet
               </p>
             ) : activeItems.length === 0 ? (
-              <p className="text-center text-gray-500 py-8">
-                No items have been counted yet
-              </p>
+              // Show simple player list when no items counted yet
+              <div className="space-y-2">
+                <p className="text-sm text-gray-600 mb-4">
+                  No items have been counted yet. Start counting to see the
+                  leaderboard!
+                </p>
+                <div className="space-y-1">
+                  {leaderboardData.map((player) => {
+                    const isOnline =
+                      Date.now() - (player.lastSeenAt || 0) < 15000;
+                    return (
+                      <div
+                        key={player.id}
+                        className="flex items-center justify-between p-2 bg-gray-50 rounded"
+                      >
+                        <div className="flex items-center">
+                          {isOnline && (
+                            <span
+                              className="w-2 h-2 bg-green-500 rounded-full mr-2"
+                              title="Online now"
+                            />
+                          )}
+                          <span className="font-medium">
+                            {player.displayName}
+                          </span>
+                        </div>
+                        <span className="text-gray-500">0 items</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
@@ -217,7 +248,9 @@ export function LeaderboardModal({
                         <tr
                           key={player.id}
                           className={`border-b border-gray-200 ${
-                            index === 0 && player.total > 0 ? "bg-yellow-50" : ""
+                            index === 0 && player.total > 0
+                              ? "bg-yellow-50"
+                              : ""
                           }`}
                         >
                           <td className="p-2 font-medium sticky left-0 bg-white">
