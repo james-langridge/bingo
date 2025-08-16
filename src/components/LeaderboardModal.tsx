@@ -24,22 +24,24 @@ export function LeaderboardModal({
   gameCode,
 }: LeaderboardModalProps) {
   const [playersData, setPlayersData] = useState<PlayerWithCounts[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [hasLoaded, setHasLoaded] = useState(false);
+  const [loading, setLoading] = useState(true); // Start with loading true for initial load
+  const [hasInitialLoad, setHasInitialLoad] = useState(false);
 
-  // Reset hasLoaded when modal closes
+  // Reset hasInitialLoad when modal closes
   useEffect(() => {
     if (!isOpen) {
-      setHasLoaded(false);
+      setHasInitialLoad(false);
     }
   }, [isOpen]);
 
   useEffect(() => {
-    if (!isOpen || hasLoaded) return;
+    if (!isOpen) return;
 
-    const fetchPlayerCounts = async () => {
-      setLoading(true);
-      setHasLoaded(true);
+    const fetchPlayerCounts = async (isBackgroundRefresh = false) => {
+      // Only show loading on initial load, not on background refreshes
+      if (!isBackgroundRefresh && !hasInitialLoad) {
+        setLoading(true);
+      }
 
       try {
         // Fetch counts for all players
@@ -122,12 +124,26 @@ export function LeaderboardModal({
         });
         setPlayersData(currentPlayerData);
       }
-      setLoading(false);
+      // Only set loading false after initial load
+      if (!isBackgroundRefresh) {
+        setLoading(false);
+        setHasInitialLoad(true);
+      }
     };
 
-    fetchPlayerCounts();
+    // Initial load
+    if (!hasInitialLoad) {
+      fetchPlayerCounts(false);
+    }
+
+    // Set up interval for background refresh (every 5 seconds)
+    const interval = setInterval(() => {
+      fetchPlayerCounts(true); // Background refresh
+    }, 5000);
+
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, hasLoaded, gameCode]); // Only re-fetch when modal opens
+  }, [isOpen, gameCode, currentPlayerState]); // Re-run when modal opens or state changes
 
   if (!isOpen) return null;
 
