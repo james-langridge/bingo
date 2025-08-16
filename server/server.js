@@ -330,48 +330,50 @@ fastify.get("/api/game/:code/leaderboard", async (request, reply) => {
 
     const game = typeof gameData === "string" ? JSON.parse(gameData) : gameData;
 
-    // Get all player states for this game
-    const playerKeys = await upstash.keys(`player:${code}:*`);
+    // Build leaderboard data for all players in the game
     const playersWithCounts = [];
 
-    for (const key of playerKeys) {
-      const playerStateData = await upstash.get(key);
-      if (playerStateData) {
-        const playerState =
-          typeof playerStateData === "string"
-            ? JSON.parse(playerStateData)
-            : playerStateData;
+    // Instead of using keys command, iterate through known players
+    if (game.players && game.players.length > 0) {
+      for (const player of game.players) {
+        // Try to fetch player state by constructing the key
+        let playerState = null;
+        let total = 0;
+        const textCounts = {};
 
-        // Find the corresponding player in the game
-        const player = game.players?.find(
-          (p) => p.displayName === playerState.displayName,
-        );
-
-        if (player) {
-          // Convert position-based counts to item-text-based counts
-          const textCounts = {};
-          let total = 0;
-
-          if (playerState.itemCounts) {
-            Object.entries(playerState.itemCounts).forEach(
-              ([position, count]) => {
-                const item = game.items.find(
-                  (i) => i.position === parseInt(position),
-                );
-                if (item) {
-                  textCounts[item.text] = count;
-                  total += count;
-                }
-              },
-            );
+        // Try to get player state using their ID
+        if (player.id) {
+          const playerStateData = await upstash.get(
+            `player:${code}:${player.id}`,
+          );
+          if (playerStateData) {
+            playerState =
+              typeof playerStateData === "string"
+                ? JSON.parse(playerStateData)
+                : playerStateData;
           }
-
-          playersWithCounts.push({
-            ...player,
-            itemCounts: textCounts,
-            total,
-          });
         }
+
+        // If we found player state, extract their counts
+        if (playerState && playerState.itemCounts) {
+          Object.entries(playerState.itemCounts).forEach(
+            ([position, count]) => {
+              const item = game.items.find(
+                (i) => i.position === parseInt(position),
+              );
+              if (item) {
+                textCounts[item.text] = count;
+                total += count;
+              }
+            },
+          );
+        }
+
+        playersWithCounts.push({
+          ...player,
+          itemCounts: textCounts,
+          total,
+        });
       }
     }
 
