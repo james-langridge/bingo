@@ -6,6 +6,7 @@ import { Celebration } from "./Celebration";
 import { LoadingSkeleton } from "./LoadingSkeleton";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { WinnerNotification } from "./WinnerNotification";
+import { GameMenu } from "./GameMenu";
 import { shuffleItems } from "../lib/calculations";
 import { getSyncManager } from "../lib/syncManager";
 
@@ -303,21 +304,14 @@ export function GamePlayer() {
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 py-4 relative">
       <div className="container mx-auto px-2 max-w-4xl">
         <div className="mb-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 px-2">
+          <div className="flex justify-between items-start mb-3 px-2">
             <div>
               <h1 className="text-2xl font-bold">{currentGame.title}</h1>
               <p className="text-gray-600">
                 Game Code: <span className="font-mono font-bold">{code}</span>
               </p>
             </div>
-            <div className="flex gap-2 mt-2 sm:mt-0">
-              <button
-                onClick={() => navigate("/")}
-                className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
-              >
-                Home
-              </button>
-            </div>
+            <GameMenu gameCode={code} />
           </div>
 
           {/* Players list sidebar */}
