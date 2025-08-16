@@ -43,7 +43,6 @@ interface GameStore {
 
   joinGame: (gameCode: string, displayName: string) => Promise<void>;
   markPosition: (position: number) => void;
-  clearMarkedPositions: () => void;
 
   checkForWinner: () => Promise<void>;
   announceWin: () => Promise<void>;
@@ -250,21 +249,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       ]).catch(() => {});
 
       get().checkForWinner();
-    }
-  },
-
-  clearMarkedPositions: () => {
-    set(
-      produce((draft: WritableDraft<GameStore>) => {
-        if (!draft.playerState) return;
-        draft.playerState.markedPositions = [];
-        draft.playerState.lastSyncAt = Date.now();
-      }),
-    );
-
-    const { playerState } = get();
-    if (playerState) {
-      persistPlayerState(playerState);
     }
   },
 

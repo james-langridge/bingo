@@ -19,7 +19,6 @@ export function GamePlayer() {
     loadGame,
     joinGame,
     markPosition,
-    clearMarkedPositions,
   } = useGameStore();
   const [displayName, setDisplayName] = useState("");
   const [isJoining, setIsJoining] = useState(false);
@@ -323,12 +322,6 @@ export function GamePlayer() {
                 className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
               >
                 Home
-              </button>
-              <button
-                onClick={clearMarkedPositions}
-                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
-              >
-                Clear Board
               </button>
             </div>
           </div>
