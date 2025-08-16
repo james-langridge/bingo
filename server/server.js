@@ -317,6 +317,74 @@ fastify.get("/api/game/:code", async (request, reply) => {
   }
 });
 
+// Get leaderboard data
+fastify.get("/api/game/:code/leaderboard", async (request, reply) => {
+  const { code } = request.params;
+
+  try {
+    const gameData = await upstash.get(`game:${code}`);
+    if (!gameData) {
+      reply.code(404);
+      return { error: "Game not found" };
+    }
+
+    const game = typeof gameData === "string" ? JSON.parse(gameData) : gameData;
+
+    // Get all player states for this game
+    const playerKeys = await upstash.keys(`player:${code}:*`);
+    const playersWithCounts = [];
+
+    for (const key of playerKeys) {
+      const playerStateData = await upstash.get(key);
+      if (playerStateData) {
+        const playerState =
+          typeof playerStateData === "string"
+            ? JSON.parse(playerStateData)
+            : playerStateData;
+
+        // Find the corresponding player in the game
+        const player = game.players?.find(
+          (p) => p.displayName === playerState.displayName,
+        );
+
+        if (player) {
+          // Convert position-based counts to item-text-based counts
+          const textCounts = {};
+          let total = 0;
+
+          if (playerState.itemCounts) {
+            Object.entries(playerState.itemCounts).forEach(
+              ([position, count]) => {
+                const item = game.items.find(
+                  (i) => i.position === parseInt(position),
+                );
+                if (item) {
+                  textCounts[item.text] = count;
+                  total += count;
+                }
+              },
+            );
+          }
+
+          playersWithCounts.push({
+            ...player,
+            itemCounts: textCounts,
+            total,
+          });
+        }
+      }
+    }
+
+    return {
+      players: playersWithCounts.sort((a, b) => b.total - a.total),
+    };
+  } catch (error) {
+    fastify.log.error(error);
+    reply.code(500);
+    return { error: "Failed to load leaderboard" };
+  }
+});
+
 // Claim win endpoint
 fastify.post("/api/game/:code/claim-win", async (request, reply) => {
   const { code } = request.params;
