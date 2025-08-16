@@ -202,8 +202,8 @@ export function GamePlayer() {
   // Show join form if not yet joined
   if (!playerState) {
     return (
-      <div className="min-h-screen bg-gray-100 py-8">
-        <div className="container mx-auto px-4 max-w-md">
+      <div className="min-h-screen bg-gray-100 py-4">
+        <div className="container mx-auto px-3 max-w-md">
           <div className="bg-white rounded-lg shadow-md p-6">
             <h1 className="text-2xl font-bold mb-2">{currentGame.title}</h1>
             <p className="text-gray-600 mb-6">
@@ -276,8 +276,8 @@ export function GamePlayer() {
   // Check if there are enough items for the game
   if (currentGame.items.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-100 py-8">
-        <div className="container mx-auto px-4 max-w-lg">
+      <div className="min-h-screen bg-gray-100 py-4">
+        <div className="container mx-auto px-3 max-w-lg">
           <div className="bg-white rounded-lg shadow-md p-6 text-center">
             <h1 className="text-2xl font-bold mb-2">{currentGame.title}</h1>
             <p className="text-gray-600 mb-4">
@@ -301,10 +301,10 @@ export function GamePlayer() {
       : false;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 py-8 relative">
-      <div className="container mx-auto px-4 max-w-4xl">
-        <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 mb-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 py-4 relative">
+      <div className="container mx-auto px-2 max-w-4xl">
+        <div className="mb-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 px-2">
             <div>
               <h1 className="text-2xl font-bold">{currentGame.title}</h1>
               <p className="text-gray-600">
@@ -317,7 +317,7 @@ export function GamePlayer() {
                 </span>
               </p>
             </div>
-            <div className="flex gap-2 mt-3 sm:mt-0">
+            <div className="flex gap-2 mt-2 sm:mt-0">
               <button
                 onClick={() => navigate("/")}
                 className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
@@ -334,13 +334,13 @@ export function GamePlayer() {
           </div>
 
           {/* Players list sidebar */}
-          <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-            <div className="flex items-center justify-between mb-2">
+          <div className="mb-3 p-2 bg-gray-50 rounded-lg mx-2">
+            <div className="flex items-center justify-between mb-1">
               <h3 className="text-sm font-semibold text-gray-700">
                 Players in Game ({currentGame.players.length})
               </h3>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1">
               {currentGame.players.map((player) => {
                 // Calculate if player is online (lastSeenAt within 15 seconds)
                 const isOnline = Date.now() - (player.lastSeenAt || 0) < 15000;
@@ -404,7 +404,7 @@ export function GamePlayer() {
             />
           </ErrorBoundary>
 
-          <p className="text-center text-sm text-gray-600 mt-4">
+          <p className="text-center text-sm text-gray-600 mt-3 px-2">
             Win condition: Mark all squares
           </p>
         </div>

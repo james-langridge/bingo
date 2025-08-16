@@ -54,7 +54,7 @@ export const BingoTile = memo(
           lineHeight,
         }}
       >
-        <span className="flex-1 px-2 relative z-10">
+        <span className="flex-1 px-1 relative z-10">
           {item.text || "(empty)"}
         </span>
 

@@ -29,7 +29,7 @@ export const GameBoard = memo(
 
     return (
       <>
-        <div className="flex flex-col gap-2 p-4 w-full max-w-2xl mx-auto">
+        <div className="flex flex-col gap-1.5 p-1 w-full max-w-2xl mx-auto">
           {items.map((item, index) => {
             const isMarkedByMe = markedPositions.includes(item.position);
             const markedByOthers = getMarkedByOthers(item);

@@ -15,10 +15,10 @@ export function calculateTileSize(): TileSize {
  * Responsive padding based on text length
  */
 export function getTilePadding(textLength: number): string {
-  if (textLength < 30) return "p-6";
-  if (textLength < 80) return "p-5";
-  if (textLength < 150) return "p-4";
-  return "p-3";
+  if (textLength < 30) return "p-3";
+  if (textLength < 80) return "p-2.5";
+  if (textLength < 150) return "p-2";
+  return "p-2";
 }
 
 /**
@@ -61,7 +61,7 @@ export function getTileClasses(
   const baseClasses = `
     rounded-lg font-medium
     transition-all transform active:scale-[0.98]
-    min-h-[80px] w-full
+    min-h-[60px] w-full
     flex items-center justify-start text-left
     break-words
     relative overflow-hidden
