@@ -6,7 +6,7 @@ import { Celebration } from "./Celebration";
 import { LoadingSkeleton } from "./LoadingSkeleton";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { WinnerNotification } from "./WinnerNotification";
-import { GameMenu } from "./GameMenu";
+import { ShareModal } from "./ShareModal";
 import { shuffleItems } from "../lib/calculations";
 import { getSyncManager } from "../lib/syncManager";
 
@@ -25,6 +25,7 @@ export function GamePlayer() {
   const [isJoining, setIsJoining] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   // Deterministic shuffle - always call this hook, even if we don't use the result yet
   const shuffledItems = useMemo(() => {
@@ -311,7 +312,42 @@ export function GamePlayer() {
                 Game Code: <span className="font-mono font-bold">{code}</span>
               </p>
             </div>
-            <GameMenu gameCode={code} />
+            <div className="flex gap-2">
+              <button
+                onClick={() => navigate("/")}
+                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                aria-label="Home"
+              >
+                <svg
+                  className="w-6 h-6 text-gray-700"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setShowShareModal(true)}
+                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                aria-label="Share"
+              >
+                <svg
+                  className="w-6 h-6 text-gray-700"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m9.032 4.026a9.001 9.001 0 01-7.432 0m9.032-4.026A9.001 9.001 0 0112 3c-4.474 0-8.268 3.12-9.032 7.326m0 0A9.001 9.001 0 0012 21c4.474 0 8.268-3.12 9.032-7.326M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </button>
+            </div>
           </div>
 
           {/* Players list sidebar */}
@@ -386,6 +422,15 @@ export function GamePlayer() {
       </div>
 
       {hasWon && <Celebration />}
+
+      {showShareModal && currentGame && (
+        <ShareModal
+          isOpen={showShareModal}
+          onClose={() => setShowShareModal(false)}
+          gameCode={currentGame.gameCode}
+          gameTitle={currentGame.title}
+        />
+      )}
     </div>
   );
 }
