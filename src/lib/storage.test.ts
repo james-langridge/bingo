@@ -46,9 +46,8 @@ const mockGame: Game = {
 const mockPlayerState: PlayerState = {
   gameCode: "ABC234",
   displayName: "Player 1",
-  markedPositions: [0, 5, 10],
+  itemCounts: { 0: 1, 5: 2, 10: 3 },
   lastSyncAt: Date.now(),
-  hasWon: false,
 };
 
 describe("storage", () => {
@@ -291,12 +290,12 @@ describe("storage", () => {
 
     test("updates existing player state for same game code", async () => {
       await savePlayerState(mockPlayerState);
-      const updated = { ...mockPlayerState, markedPositions: [1, 2, 3] };
+      const updated = { ...mockPlayerState, itemCounts: { 1: 1, 2: 1, 3: 1 } };
       await savePlayerState(updated);
 
       const states = await db.playerStates.toArray();
       expect(states).toHaveLength(1);
-      expect(states[0].markedPositions).toEqual([1, 2, 3]);
+      expect(states[0].itemCounts).toEqual({ 1: 1, 2: 1, 3: 1 });
     });
 
     test("handles multiple game states", async () => {

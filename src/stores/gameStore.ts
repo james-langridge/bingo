@@ -16,11 +16,6 @@ import {
   joinGame as joinGameAction,
   persistPlayerState,
 } from "./actions/playerActions";
-import { checkForWinner, claimWin } from "./actions/winActions";
-import {
-  toggleItemMark,
-  updateMarkedPositions,
-} from "./calculations/itemCalculations";
 
 interface GameStore {
   currentGame: Game | null;
@@ -44,8 +39,6 @@ interface GameStore {
   joinGame: (gameCode: string, displayName: string) => Promise<void>;
   markPosition: (position: number) => void;
 
-  checkForWinner: () => Promise<void>;
-  announceWin: () => Promise<void>;
   handleRealtimeUpdate: (game: Game) => void;
   setConnectionStatus: (isConnected: boolean) => void;
 
@@ -203,41 +196,23 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   markPosition: (position) => {
-    const { currentGame, currentPlayerId, playerState } = get();
-    if (!currentGame || !playerState || !currentPlayerId) return;
-
-    if (playerState.hasWon || currentGame.winner) {
-      return;
-    }
+    const { currentGame, playerState } = get();
+    if (!currentGame || !playerState) return;
 
     set(
       produce((draft: WritableDraft<GameStore>) => {
         if (!draft.playerState || !draft.currentGame) return;
 
-        const marked = draft.playerState.markedPositions as number[];
-        const isUnmarking = marked.includes(position);
+        const currentCounts = draft.playerState.itemCounts as Record<
+          number,
+          number
+        >;
+        const currentCount = currentCounts[position] || 0;
 
-        (draft.playerState.markedPositions as number[]) = updateMarkedPositions(
-          marked,
-          position,
-          isUnmarking,
-        ) as number[];
+        // Increment the count for this position
+        (draft.playerState.itemCounts as Record<number, number>)[position] =
+          currentCount + 1;
         (draft.playerState.lastSyncAt as number) = Date.now();
-
-        const itemIndex = (draft.currentGame.items as BingoItem[]).findIndex(
-          (item) => item.position === position,
-        );
-
-        if (itemIndex >= 0) {
-          const item = draft.currentGame.items[itemIndex];
-          (draft.currentGame.items as WritableDraft<BingoItem>[])[itemIndex] =
-            toggleItemMark(
-              item,
-              currentPlayerId,
-              playerState.displayName,
-              isUnmarking,
-            ) as WritableDraft<BingoItem>;
-        }
       }),
     );
 
@@ -247,90 +222,22 @@ export const useGameStore = create<GameStore>((set, get) => ({
         persistPlayerState(updatedState.playerState),
         saveGameLocal(updatedState.currentGame),
       ]).catch(() => {});
-
-      get().checkForWinner();
-    }
-  },
-
-  checkForWinner: async () => {
-    const { currentGame, playerState } = get();
-    if (!currentGame || !playerState) return;
-
-    const hasWon = await checkForWinner(currentGame, playerState);
-    if (hasWon && !playerState.hasWon) {
-      const updatedPlayerState: PlayerState = {
-        ...playerState,
-        hasWon: true,
-      };
-      await persistPlayerState(updatedPlayerState);
-      await get().announceWin();
-    }
-  },
-
-  announceWin: async () => {
-    const { currentGame, playerState, currentPlayerId } = get();
-    if (!currentGame || !playerState || !currentPlayerId) return;
-
-    const result = await claimWin(currentGame, playerState, currentPlayerId);
-
-    if (result.accepted) {
-      set({
-        currentGame: result.game,
-        playerState: { ...playerState, hasWon: true },
-      });
-    } else {
-      set({
-        currentGame: result.game,
-        playerState: { ...playerState, hasWon: false },
-      });
     }
   },
 
   handleRealtimeUpdate: (latestGame: Game) => {
-    const { currentGame, currentPlayerId, playerState } = get();
+    const { currentGame } = get();
     if (!currentGame) return;
 
-    // Preserve local markedBy data for items since it's client-side only
-    const itemsWithPreservedMarks = latestGame.items.map((serverItem) => {
-      const localItem = currentGame.items.find(
-        (item) => item.id === serverItem.id,
-      );
-      if (localItem?.markedBy && localItem.markedBy.length > 0) {
-        // Keep the local markedBy data
-        return {
-          ...serverItem,
-          markedBy: localItem.markedBy,
-        };
-      }
-      return serverItem;
-    });
-
-    // Use the server's version but preserve local client-side data
+    // Use the server's version but preserve local admin token
     const updatedGame: Game = {
       ...latestGame,
-      items: itemsWithPreservedMarks,
       ...(currentGame.adminToken ? { adminToken: currentGame.adminToken } : {}),
     };
 
     set({
       currentGame: updatedGame,
     });
-
-    // Check if we won
-    if (
-      latestGame.winner &&
-      latestGame.winner.playerId === currentPlayerId &&
-      playerState &&
-      !playerState.hasWon
-    ) {
-      set(
-        produce((draft: WritableDraft<GameStore>) => {
-          if (draft.playerState) {
-            draft.playerState.hasWon = true;
-          }
-        }),
-      );
-    }
   },
 
   setConnectionStatus: (isConnected: boolean) => {

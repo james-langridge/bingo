@@ -1,4 +1,4 @@
-import type { Player, WinnerInfo, BingoItem } from "./types";
+import type { Player, BingoItem } from "./types";
 
 // Event payload types
 export interface MarkPayload {
@@ -14,10 +14,6 @@ export interface PlayerPayload {
   readonly joinedAt: number;
 }
 
-export interface WinnerPayload {
-  readonly winner: WinnerInfo;
-  readonly declaredAt: number;
-}
 
 export interface ItemPayload {
   readonly item: BingoItem;
@@ -29,7 +25,6 @@ export type GameEventV2 =
   | { readonly type: "ITEM_MARKED"; readonly payload: MarkPayload }
   | { readonly type: "ITEM_UNMARKED"; readonly payload: MarkPayload }
   | { readonly type: "PLAYER_JOINED"; readonly payload: PlayerPayload }
-  | { readonly type: "WINNER_DECLARED"; readonly payload: WinnerPayload }
   | { readonly type: "GAME_RESET"; readonly timestamp: number }
   | { readonly type: "ITEM_ADDED"; readonly payload: ItemPayload }
   | {
@@ -53,11 +48,6 @@ export function isPlayerJoinedEvent(
   return event.type === "PLAYER_JOINED";
 }
 
-export function isWinnerDeclaredEvent(
-  event: GameEventV2,
-): event is Extract<GameEventV2, { type: "WINNER_DECLARED" }> {
-  return event.type === "WINNER_DECLARED";
-}
 
 // Event handler type
 export type EventHandler<T extends GameEventV2 = GameEventV2> = (

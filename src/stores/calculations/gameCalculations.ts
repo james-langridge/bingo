@@ -56,7 +56,6 @@ export function upsertPlayer(
       displayName,
       joinedAt: Date.now(),
       lastSeenAt: Date.now(),
-      hasWon: false,
       isOnline: true,
     };
     updatedPlayers.push(newPlayer);
@@ -65,19 +64,6 @@ export function upsertPlayer(
   return {
     ...game,
     players: updatedPlayers,
-    lastModifiedAt: Date.now(),
-  };
-}
-
-/**
- * Mark a player as winner
- */
-export function markPlayerAsWinner(game: Game, playerId: string): Game {
-  return {
-    ...game,
-    players: game.players.map((p) =>
-      p.id === playerId ? { ...p, hasWon: true, lastSeenAt: Date.now() } : p,
-    ),
     lastModifiedAt: Date.now(),
   };
 }

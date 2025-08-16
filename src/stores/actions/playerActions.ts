@@ -41,15 +41,11 @@ export async function joinGame(
 
   let playerState = await loadPlayerState(gameCode);
   if (!playerState || playerState.displayName !== sanitizedName) {
-    const existingPlayer = updatedGame.players.find(
-      (p) => p.displayName === sanitizedName,
-    );
     playerState = {
       gameCode,
       displayName: sanitizedName,
-      markedPositions: [],
+      itemCounts: {},
       lastSyncAt: Date.now(),
-      hasWon: existingPlayer?.hasWon || false,
     };
 
     const validation = safeValidate(PlayerStateSchema, playerState);

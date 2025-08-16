@@ -437,7 +437,7 @@ describe("gameStore", () => {
       expect(result.current.playerState?.gameCode).toBe(
         result.current.currentGame?.gameCode,
       );
-      expect(result.current.playerState?.markedPositions).toEqual([]);
+      expect(result.current.playerState?.itemCounts).toEqual({});
     });
 
     test("persists player state to storage", async () => {
@@ -488,7 +488,7 @@ describe("gameStore", () => {
   });
 
   describe("markPosition", () => {
-    test("marks unmarked position", async () => {
+    test("increments count for position", async () => {
       const { result } = renderHook(() => useGameStore());
 
       await act(async () => {
@@ -500,10 +500,10 @@ describe("gameStore", () => {
         result.current.markPosition(5);
       });
 
-      expect(result.current.playerState?.markedPositions).toContain(5);
+      expect(result.current.playerState?.itemCounts[5]).toBe(1);
     });
 
-    test("unmarks marked position", async () => {
+    test("increments count on repeated clicks", async () => {
       const { result } = renderHook(() => useGameStore());
 
       await act(async () => {
@@ -516,7 +516,7 @@ describe("gameStore", () => {
         result.current.markPosition(5);
       });
 
-      expect(result.current.playerState?.markedPositions).not.toContain(5);
+      expect(result.current.playerState?.itemCounts[5]).toBe(2);
     });
 
     test("handles multiple positions", async () => {
@@ -533,7 +533,9 @@ describe("gameStore", () => {
         result.current.markPosition(10);
       });
 
-      expect(result.current.playerState?.markedPositions).toEqual([0, 5, 10]);
+      expect(result.current.playerState?.itemCounts[0]).toBe(1);
+      expect(result.current.playerState?.itemCounts[5]).toBe(1);
+      expect(result.current.playerState?.itemCounts[10]).toBe(1);
     });
 
     test("updates lastSyncAt timestamp", async () => {
@@ -573,7 +575,7 @@ describe("gameStore", () => {
 
       await waitFor(async () => {
         const storedState = await db.playerStates.get(gameCode!);
-        expect(storedState?.markedPositions).toContain(5);
+        expect(storedState?.itemCounts[5]).toBe(1);
       });
     });
 

@@ -11,23 +11,12 @@ export interface Game {
   readonly lastModifiedAt: number;
   // Multiplayer fields
   readonly players: readonly Player[];
-  readonly winner?: WinnerInfo;
 }
 
 export interface BingoItem {
   readonly id: string;
   readonly text: string;
   readonly position: number; // Position in grid
-  readonly markedBy?: readonly SquareMark[]; // Who marked this square and when
-}
-
-// NEW: Track who marked each square for vacation mode
-export interface SquareMark {
-  readonly playerId: string;
-  readonly displayName: string;
-  readonly markedAt: number;
-  readonly note?: string; // Optional note about the square
-  readonly photoUrl?: string; // Optional photo proof
 }
 
 export interface GameSettings {
@@ -39,9 +28,8 @@ export interface GameSettings {
 export interface PlayerState {
   readonly gameCode: string;
   readonly displayName: string;
-  readonly markedPositions: readonly number[]; // Grid positions (0-based index)
+  readonly itemCounts: Record<number, number>; // Position -> count of times seen
   readonly lastSyncAt: number;
-  readonly hasWon?: boolean; // NEW: Track if this player has won
 }
 
 // NEW: Player info visible to all players
@@ -50,17 +38,7 @@ export interface Player {
   readonly displayName: string;
   readonly joinedAt: number;
   readonly lastSeenAt: number; // When they last opened the game
-  readonly hasWon: boolean;
   readonly isOnline?: boolean; // Optional: currently viewing the game
-}
-
-// NEW: Winner information
-export interface WinnerInfo {
-  readonly playerId: string;
-  readonly displayName: string;
-  readonly wonAt: number;
-  readonly winType: "line" | "fullCard";
-  readonly winningPositions?: readonly number[]; // For audit/verification
 }
 
 // Event sourcing for sync
@@ -76,7 +54,6 @@ export type GameEvent =
   | { type: "GAME_RESET"; timestamp: number }
   // NEW: Multiplayer events
   | { type: "PLAYER_JOINED"; player: Player; timestamp: number }
-  | { type: "PLAYER_WON"; winner: WinnerInfo; timestamp: number }
   | {
       type: "PLAYER_UPDATED";
       playerId: string;

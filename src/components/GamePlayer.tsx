@@ -2,10 +2,8 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useGameStore } from "../stores/gameStore";
 import { GameBoard } from "./GameBoard";
-import { Celebration } from "./Celebration";
 import { LoadingSkeleton } from "./LoadingSkeleton";
 import { ErrorBoundary } from "./ErrorBoundary";
-import { WinnerNotification } from "./WinnerNotification";
 import { ShareModal } from "./ShareModal";
 import { shuffleItems } from "../lib/calculations";
 import { getSyncManager } from "../lib/syncManager";
@@ -57,17 +55,6 @@ export function GamePlayer() {
   useEffect(() => {
     console.log({ currentGame });
   }, [currentGame]);
-
-  // Log winner changes for debugging
-  useEffect(() => {
-    if (currentGame?.winner) {
-      console.log("[GamePlayer] Winner detected:", {
-        winnerName: currentGame.winner.displayName,
-        isCurrentPlayer: currentGame.winner.playerId === currentPlayerId,
-        wonAt: new Date(currentGame.winner.wonAt).toLocaleTimeString(),
-      });
-    }
-  }, [currentGame?.winner, playerState?.displayName]);
 
   // Send heartbeat to keep player marked as online (pause when tab hidden)
   useEffect(() => {
@@ -229,11 +216,6 @@ export function GamePlayer() {
                         className="text-sm text-gray-600 flex items-center"
                       >
                         • {player.displayName}
-                        {player.hasWon && (
-                          <span className="ml-2 text-green-600 font-semibold">
-                            🏆 Winner!
-                          </span>
-                        )}
                         {isOnline && (
                           <span
                             className="ml-2 w-2 h-2 bg-green-500 rounded-full inline-block"
@@ -295,11 +277,6 @@ export function GamePlayer() {
       </div>
     );
   }
-
-  const hasWon =
-    playerState && currentGame.items
-      ? playerState.markedPositions.length === currentGame.items.length
-      : false;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 py-4 relative">
@@ -364,10 +341,9 @@ export function GamePlayer() {
                       player.displayName === playerState?.displayName
                         ? "bg-blue-100 text-blue-700 font-semibold"
                         : "bg-white text-gray-600"
-                    } ${player.hasWon ? "border-2 border-green-500" : ""}`}
+                    }`}
                   >
                     <div className="flex items-center">
-                      {player.hasWon && <span className="mr-1">🏆</span>}
                       {isOnline && (
                         <span
                           className="w-2 h-2 bg-green-500 rounded-full mr-1"
@@ -381,14 +357,6 @@ export function GamePlayer() {
               })}
             </div>
           </div>
-
-          {/* Persistent winner notification */}
-          {currentGame.winner && (
-            <WinnerNotification
-              winnerName={currentGame.winner.displayName}
-              isCurrentPlayer={currentGame.winner.playerId === currentPlayerId}
-            />
-          )}
 
           <ErrorBoundary
             context="GameBoard"
@@ -408,17 +376,13 @@ export function GamePlayer() {
           >
             <GameBoard
               items={shuffledItems}
-              markedPositions={playerState?.markedPositions || []}
+              itemCounts={playerState?.itemCounts || {}}
               onItemClick={markPosition}
               gridSize={currentGame.settings?.gridSize || 5}
-              currentPlayerId={currentPlayerId || undefined}
-              currentPlayerName={playerState?.displayName}
             />
           </ErrorBoundary>
         </div>
       </div>
-
-      {hasWon && <Celebration />}
 
       {showShareModal && currentGame && (
         <ShareModal

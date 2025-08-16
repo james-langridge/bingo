@@ -17,7 +17,7 @@ describe("GameBoard", () => {
 
   const defaultProps = {
     items: mockItems,
-    markedPositions: [],
+    itemCounts: {},
     gridSize: 3,
     onItemClick: vi.fn(),
   };
@@ -78,42 +78,50 @@ describe("GameBoard", () => {
     });
   });
 
-  describe("marking items", () => {
-    test("applies marked styling to marked positions", () => {
-      render(<GameBoard {...defaultProps} markedPositions={[0, 4, 8]} />);
+  describe("counting items", () => {
+    test("displays count when item has been seen", () => {
+      render(<GameBoard {...defaultProps} itemCounts={{ 0: 3, 4: 1, 8: 5 }} />);
+
+      // Check that counts are displayed
+      expect(screen.getByText("3")).toBeInTheDocument();
+      expect(screen.getByText("1")).toBeInTheDocument();
+      expect(screen.getByText("5")).toBeInTheDocument();
+    });
+
+    test("applies marked styling to items with counts", () => {
+      render(<GameBoard {...defaultProps} itemCounts={{ 0: 1, 4: 2 }} />);
 
       const buttons = screen.getAllByRole("button");
 
-      // Check marked items have marked styles
+      // Check items with counts have marked styles
       expect(buttons[0].className).toContain("from-purple-500");
       expect(buttons[0].className).toContain("to-pink-500");
       expect(buttons[4].className).toContain("from-purple-500");
-      expect(buttons[8].className).toContain("from-purple-500");
 
-      // Check unmarked items don't have marked styles
+      // Check items without counts don't have marked styles
       expect(buttons[1].className).toContain("bg-white");
       expect(buttons[2].className).toContain("bg-white");
     });
 
-    test("updates styling when marked positions change", () => {
+    test("updates styling when counts change", () => {
       const { rerender } = render(
-        <GameBoard {...defaultProps} markedPositions={[0]} />,
+        <GameBoard {...defaultProps} itemCounts={{ 0: 1 }} />,
       );
 
       let buttons = screen.getAllByRole("button");
       expect(buttons[0].className).toContain("from-purple-500");
       expect(buttons[1].className).toContain("bg-white");
 
-      // Update marked positions
-      rerender(<GameBoard {...defaultProps} markedPositions={[1]} />);
+      // Update counts
+      rerender(<GameBoard {...defaultProps} itemCounts={{ 1: 1 }} />);
 
       buttons = screen.getAllByRole("button");
       expect(buttons[0].className).toContain("bg-white");
       expect(buttons[1].className).toContain("from-purple-500");
     });
 
-    test("handles empty marked positions", () => {
-      render(<GameBoard {...defaultProps} markedPositions={[]} />);
+    test("handles empty counts", () => {
+      render(<GameBoard {...defaultProps} itemCounts={{}} />);
 
       const buttons = screen.getAllByRole("button");
       buttons.forEach((button) => {
@@ -121,9 +129,19 @@ describe("GameBoard", () => {
       });
     });
 
-    test("handles all positions marked", () => {
-      const allPositions = [0, 1, 2, 3, 4, 5, 6, 7, 8];
-      render(<GameBoard {...defaultProps} markedPositions={allPositions} />);
+    test("handles all positions with counts", () => {
+      const allCounts = {
+        0: 1,
+        1: 2,
+        2: 3,
+        3: 4,
+        4: 5,
+        5: 6,
+        6: 7,
+        7: 8,
+        8: 9,
+      };
+      render(<GameBoard {...defaultProps} itemCounts={allCounts} />);
 
       const buttons = screen.getAllByRole("button");
       buttons.forEach((button) => {
@@ -219,7 +237,7 @@ describe("GameBoard", () => {
       render(
         <GameBoard
           items={mockItems}
-          markedPositions={[]}
+          itemCounts={{}}
           gridSize={3}
           onItemClick={vi.fn()}
         />,
@@ -292,32 +310,15 @@ describe("GameBoard", () => {
       expect(button.className).toContain("active:scale-[0.98]");
     });
 
-    test("applies animation style to marked items", () => {
-      // Update the first item to show it's marked by someone
-      const itemsWithMarks = [
-        {
-          ...mockItems[0],
-          markedBy: [
-            { playerId: "1", displayName: "Test", markedAt: Date.now() },
-          ],
-        },
-        ...mockItems.slice(1),
-      ];
-
-      render(
-        <GameBoard
-          {...defaultProps}
-          items={itemsWithMarks}
-          markedPositions={[0]}
-        />,
-      );
+    test("applies animation style to items with counts", () => {
+      render(<GameBoard {...defaultProps} itemCounts={{ 0: 1 }} />);
 
       const button = screen.getAllByRole("button")[0];
       expect(button).toHaveStyle({ animation: "pop 0.3s ease-out" });
     });
 
-    test("does not apply animation to unmarked items", () => {
-      render(<GameBoard {...defaultProps} markedPositions={[]} />);
+    test("does not apply animation to items without counts", () => {
+      render(<GameBoard {...defaultProps} itemCounts={{}} />);
 
       const button = screen.getAllByRole("button")[0];
       // Check that animation is not set (empty string or not present)

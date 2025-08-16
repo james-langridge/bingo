@@ -1,45 +1,34 @@
 import { memo } from "react";
 import type { BingoItem } from "../../types/types";
 import { BingoTile } from "./BingoTile";
-import { useGameBoard } from "../../hooks/useGameBoard";
 
 interface GameBoardProps {
   items: readonly BingoItem[];
-  markedPositions: readonly number[];
+  itemCounts: Record<number, number>;
   gridSize: number;
   onItemClick: (position: number) => void;
   enableHaptic?: boolean;
-  currentPlayerId?: string;
-  currentPlayerName?: string;
 }
 
 export const GameBoard = memo(
   ({
     items,
-    markedPositions,
+    itemCounts,
     gridSize: _gridSize, // Kept for API compatibility
     onItemClick,
     enableHaptic = true,
-    currentPlayerId,
   }: GameBoardProps) => {
-    const { getMarkedByOthers } = useGameBoard({
-      items,
-      currentPlayerId,
-    });
-
     return (
       <>
         <div className="flex flex-col gap-1.5 p-1 w-full max-w-2xl mx-auto">
           {items.map((item, index) => {
-            const isMarkedByMe = markedPositions.includes(item.position);
-            const markedByOthers = getMarkedByOthers(item);
+            const count = itemCounts[item.position] || 0;
 
             return (
               <BingoTile
                 key={`${item.id}-${index}`}
                 item={item}
-                isMarkedByMe={isMarkedByMe}
-                markedByOthers={markedByOthers}
+                count={count}
                 onClick={() => onItemClick(item.position)}
                 enableHaptic={enableHaptic}
               />
