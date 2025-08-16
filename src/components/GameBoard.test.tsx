@@ -42,17 +42,15 @@ describe("GameBoard", () => {
       expect(buttons).toHaveLength(9);
     });
 
-    test("applies responsive grid layout", () => {
+    test("applies single-column list layout", () => {
       const { container } = render(<GameBoard {...defaultProps} />);
 
-      const grid = container.querySelector(".grid");
-      expect(grid).toHaveStyle({
-        gridAutoRows: "minmax(90px, auto)",
-        gridAutoFlow: "dense",
-      });
+      const list = container.querySelector(".flex.flex-col");
+      expect(list).toBeInTheDocument();
+      expect(list).toHaveClass("flex", "flex-col", "gap-2");
     });
 
-    test("handles different grid sizes", () => {
+    test("handles different number of items", () => {
       const items25 = Array.from({ length: 25 }, (_, i) => ({
         id: `${i}`,
         text: `Item ${i}`,
@@ -63,12 +61,8 @@ describe("GameBoard", () => {
         <GameBoard {...defaultProps} items={items25} gridSize={5} />,
       );
 
-      const grid = container.querySelector(".grid");
-      // Check that grid has responsive auto-fit columns
-      expect(grid).toHaveStyle({
-        gridAutoRows: "minmax(90px, auto)",
-        gridAutoFlow: "dense",
-      });
+      const list = container.querySelector(".flex.flex-col");
+      expect(list).toBeInTheDocument();
 
       const buttons = screen.getAllByRole("button");
       expect(buttons).toHaveLength(25);
@@ -285,8 +279,8 @@ describe("GameBoard", () => {
       render(<GameBoard {...defaultProps} />);
 
       const button = screen.getAllByRole("button")[0];
-      expect(button.className).toContain("min-h-[90px]");
-      expect(button.className).toContain("rounded-xl");
+      expect(button.className).toContain("min-h-[80px]");
+      expect(button.className).toContain("rounded-lg");
       expect(button.className).toContain("font-medium");
     });
 
@@ -295,7 +289,7 @@ describe("GameBoard", () => {
 
       const button = screen.getAllByRole("button")[0];
       expect(button.className).toContain("hover:border-purple-300");
-      expect(button.className).toContain("active:scale-95");
+      expect(button.className).toContain("active:scale-[0.98]");
     });
 
     test("applies animation style to marked items", () => {
