@@ -26,6 +26,11 @@ export function LeaderboardModal({
   const [playersData, setPlayersData] = useState<PlayerWithCounts[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Memoize player IDs to avoid re-fetching when only lastSeenAt changes
+  const playerIds = useMemo(() => {
+    return players.map((p) => p.id).join(",");
+  }, [players]);
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -117,7 +122,7 @@ export function LeaderboardModal({
     };
 
     fetchPlayerCounts();
-  }, [isOpen, players, items, currentPlayerState, gameCode]);
+  }, [isOpen, playerIds, items, currentPlayerState, gameCode]); // Use playerIds instead of players
 
   if (!isOpen) return null;
 

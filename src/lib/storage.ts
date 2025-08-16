@@ -69,13 +69,27 @@ async function fetchGameFromServer(gameCode: string): Promise<Game | null> {
   return null;
 }
 
-async function syncPlayerStateToServer(state: PlayerState): Promise<boolean> {
+async function syncPlayerStateToServer(
+  state: PlayerState,
+  playerId?: string,
+): Promise<boolean> {
   try {
+    // Include playerId if available from store
+    const stateWithId = playerId ? { ...state, playerId } : state;
+
     const response = await fetch(`/api/player/${state.gameCode}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(state),
+      body: JSON.stringify(stateWithId),
     });
+
+    if (response.ok) {
+      const data = await response.json();
+      // Store the playerId for future use if returned
+      if (data.playerId) {
+        localStorage.setItem(`playerId-${state.gameCode}`, data.playerId);
+      }
+    }
 
     return response.ok;
   } catch (error) {
@@ -174,14 +188,21 @@ export async function savePlayerState(playerState: PlayerState): Promise<void> {
 
   await db.playerStates.put(playerState);
 
-  syncPlayerStateToServer(playerState).then((success) => {
-    if (!success && navigator.onLine) {
-      queueEvent({
-        type: "GAME_RESET",
-        timestamp: Date.now(),
-      } as GameEvent);
-    }
-  });
+  // Get stored playerId for this game
+  const storedPlayerId = localStorage.getItem(
+    `playerId-${playerState.gameCode}`,
+  );
+
+  syncPlayerStateToServer(playerState, storedPlayerId || undefined).then(
+    (success) => {
+      if (!success && navigator.onLine) {
+        queueEvent({
+          type: "GAME_RESET",
+          timestamp: Date.now(),
+        } as GameEvent);
+      }
+    },
+  );
 }
 
 export async function loadPlayerState(

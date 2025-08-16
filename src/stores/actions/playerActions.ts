@@ -27,6 +27,9 @@ export async function joinGame(
   const playerId = crypto.randomUUID();
   const updatedGame = upsertPlayer(game, playerId, sanitizedName);
 
+  // Store playerId for future syncs
+  localStorage.setItem(`playerId-${gameCode}`, playerId);
+
   await saveGameLocal(updatedGame);
 
   if (navigator.onLine) {
