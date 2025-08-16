@@ -323,9 +323,7 @@ export function GamePlayer() {
           {/* Players list sidebar */}
           <div className="mb-3 p-2 bg-gray-50 rounded-lg mx-2">
             <div className="flex items-center justify-between mb-1">
-              <h3 className="text-sm font-semibold text-gray-700">
-                Players in Game ({currentGame.players.length})
-              </h3>
+              <h3 className="text-sm font-semibold text-gray-700">Players</h3>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1">
               {currentGame.players.map((player) => {
