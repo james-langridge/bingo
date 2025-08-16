@@ -308,9 +308,6 @@ export function GamePlayer() {
           <div className="flex justify-between items-start mb-3 px-2">
             <div>
               <h1 className="text-2xl font-bold">{currentGame.title}</h1>
-              <p className="text-gray-600">
-                Game Code: <span className="font-mono font-bold">{code}</span>
-              </p>
             </div>
             <div className="flex gap-2">
               <button
