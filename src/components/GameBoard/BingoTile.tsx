@@ -1,5 +1,5 @@
 import { memo } from "react";
-import type { BingoItem } from "../../types/types";
+import type { BingoItem, Player } from "../../types/types";
 import {
   getTilePadding,
   getTileFontSize,
@@ -7,16 +7,30 @@ import {
   getTileClasses,
 } from "../../lib/gameboard/calculations";
 import { UI_CONFIG } from "../../lib/constants";
+import { getPlayerColor } from "../../lib/playerColors";
+
+interface PlayerCount {
+  player: Player;
+  count: number;
+  playerIndex: number;
+}
 
 interface BingoTileProps {
   item: BingoItem;
   count: number;
   onClick: () => void;
   enableHaptic?: boolean;
+  playerCounts?: PlayerCount[]; // Other players' counts for this item
 }
 
 export const BingoTile = memo(
-  ({ item, count, onClick, enableHaptic = true }: BingoTileProps) => {
+  ({
+    item,
+    count,
+    onClick,
+    enableHaptic = true,
+    playerCounts = [],
+  }: BingoTileProps) => {
     const textLength = item.text?.length || 0;
     const isMarked = count > 0;
 
@@ -35,7 +49,7 @@ export const BingoTile = memo(
     return (
       <button
         onClick={handleClick}
-        className={`${padding} ${classes}`}
+        className={`${padding} ${classes} relative`}
         style={{
           animation: isMarked ? "pop 0.3s ease-out" : undefined,
           fontSize,
@@ -46,10 +60,26 @@ export const BingoTile = memo(
           {item.text || "(empty)"}
         </span>
 
-        {/* Show count if greater than zero */}
+        {/* Show current player's count */}
         {count > 0 && (
           <div className="flex items-center justify-center bg-green-500 text-white rounded-full min-w-[28px] h-7 px-2 mr-2 font-bold text-sm">
             {count}
+          </div>
+        )}
+
+        {/* Show other players' indicators in bottom left */}
+        {playerCounts.length > 0 && (
+          <div className="absolute bottom-1 left-1 flex gap-1 flex-wrap max-w-[calc(100%-8px)]">
+            {playerCounts.map(({ player, count: playerCount, playerIndex }) => (
+              <div
+                key={player.id}
+                className="flex items-center justify-center text-white rounded-full w-6 h-6 text-xs font-bold"
+                style={{ backgroundColor: getPlayerColor(playerIndex) }}
+                title={`${player.displayName}: ${playerCount}`}
+              >
+                {playerCount}
+              </div>
+            ))}
           </div>
         )}
       </button>

@@ -317,8 +317,8 @@ fastify.get("/api/game/:code", async (request, reply) => {
   }
 });
 
-// Get leaderboard data
-fastify.get("/api/game/:code/leaderboard", async (request, reply) => {
+// Get all player counts for real-time display
+fastify.get("/api/game/:code/player-counts", async (request, reply) => {
   const { code } = request.params;
 
   try {
@@ -330,60 +330,43 @@ fastify.get("/api/game/:code/leaderboard", async (request, reply) => {
 
     const game = typeof gameData === "string" ? JSON.parse(gameData) : gameData;
 
-    // Build leaderboard data for all players in the game
-    const playersWithCounts = [];
+    // Get all player counts
+    const playerCounts = [];
 
-    // Instead of using keys command, iterate through known players
     if (game.players && game.players.length > 0) {
       for (const player of game.players) {
-        // Try to fetch player state by constructing the key
-        let playerState = null;
-        let total = 0;
-        const textCounts = {};
-
-        // Try to get player state using their ID
         if (player.id) {
           const playerStateData = await upstash.get(
             `player:${code}:${player.id}`,
           );
           if (playerStateData) {
-            playerState =
+            const playerState =
               typeof playerStateData === "string"
                 ? JSON.parse(playerStateData)
                 : playerStateData;
+
+            playerCounts.push({
+              playerId: player.id,
+              displayName: player.displayName,
+              itemCounts: playerState.itemCounts || {},
+            });
+          } else {
+            // Include player with empty counts if no state found
+            playerCounts.push({
+              playerId: player.id,
+              displayName: player.displayName,
+              itemCounts: {},
+            });
           }
         }
-
-        // If we found player state, extract their counts
-        if (playerState && playerState.itemCounts) {
-          Object.entries(playerState.itemCounts).forEach(
-            ([position, count]) => {
-              const item = game.items.find(
-                (i) => i.position === parseInt(position),
-              );
-              if (item) {
-                textCounts[item.text] = count;
-                total += count;
-              }
-            },
-          );
-        }
-
-        playersWithCounts.push({
-          ...player,
-          itemCounts: textCounts,
-          total,
-        });
       }
     }
 
-    return {
-      players: playersWithCounts.sort((a, b) => b.total - a.total),
-    };
+    return { playerCounts };
   } catch (error) {
-    fastify.log.error(error);
+    fastify.log.error("Player counts error:", error);
     reply.code(500);
-    return { error: "Failed to load leaderboard" };
+    return { error: "Failed to load player counts" };
   }
 });
 

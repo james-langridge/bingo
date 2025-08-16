@@ -5,7 +5,6 @@ import { GameBoard } from "./GameBoard";
 import { LoadingSkeleton } from "./LoadingSkeleton";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { ShareModal } from "./ShareModal";
-import { LeaderboardModal } from "./LeaderboardModal";
 import { shuffleItems } from "../lib/calculations";
 import { getSyncManager } from "../lib/syncManager";
 
@@ -16,6 +15,7 @@ export function GamePlayer() {
     currentGame,
     playerState,
     currentPlayerId,
+    allPlayerCounts,
     loadGame,
     joinGame,
     markPosition,
@@ -25,7 +25,6 @@ export function GamePlayer() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
-  const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
 
   // Deterministic shuffle - always call this hook, even if we don't use the result yet
   const shuffledItems = useMemo(() => {
@@ -307,23 +306,6 @@ export function GamePlayer() {
                 </svg>
               </button>
               <button
-                onClick={() => setShowLeaderboardModal(true)}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                aria-label="Leaderboard"
-              >
-                <svg
-                  className="w-6 h-6 text-gray-700"
-                  fill="none"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-              </button>
-              <button
                 onClick={() => setShowShareModal(true)}
                 className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
                 aria-label="Share"
@@ -398,6 +380,9 @@ export function GamePlayer() {
               itemCounts={playerState?.itemCounts || {}}
               onItemClick={markPosition}
               gridSize={currentGame.settings?.gridSize || 5}
+              players={currentGame.players}
+              allPlayerCounts={allPlayerCounts}
+              currentPlayerName={playerState?.displayName}
             />
           </ErrorBoundary>
         </div>
@@ -409,17 +394,6 @@ export function GamePlayer() {
           onClose={() => setShowShareModal(false)}
           gameCode={currentGame.gameCode}
           gameTitle={currentGame.title}
-        />
-      )}
-
-      {showLeaderboardModal && currentGame && (
-        <LeaderboardModal
-          isOpen={showLeaderboardModal}
-          onClose={() => setShowLeaderboardModal(false)}
-          players={currentGame.players}
-          items={currentGame.items}
-          currentPlayerState={playerState}
-          gameCode={currentGame.gameCode}
         />
       )}
     </div>

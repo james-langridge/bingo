@@ -41,6 +41,13 @@ export interface Player {
   readonly isOnline?: boolean; // Optional: currently viewing the game
 }
 
+// Track all players' item counts for real-time display
+export interface PlayerItemCounts {
+  readonly playerId: string;
+  readonly displayName: string;
+  readonly itemCounts: Record<number, number>; // Position -> count
+}
+
 // Event sourcing for sync
 export type GameEvent =
   | { type: "ITEM_ADDED"; itemId: string; text: string; timestamp: number }

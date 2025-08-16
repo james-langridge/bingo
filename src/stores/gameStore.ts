@@ -1,7 +1,12 @@
 import { create } from "zustand";
 import { produce } from "immer";
 import type { WritableDraft } from "immer";
-import type { Game, PlayerState, BingoItem } from "../types/types.ts";
+import type {
+  Game,
+  PlayerState,
+  BingoItem,
+  PlayerItemCounts,
+} from "../types/types.ts";
 import { loadPlayerState, saveGameLocal } from "../lib/storage";
 import { getSyncManager } from "../lib/syncManager";
 
@@ -20,6 +25,7 @@ import {
 interface GameStore {
   currentGame: Game | null;
   playerState: PlayerState | null;
+  allPlayerCounts: PlayerItemCounts[]; // Track all players' counts
   localGames: {
     id: string;
     gameCode: string;
@@ -41,6 +47,7 @@ interface GameStore {
 
   handleRealtimeUpdate: (game: Game) => void;
   setConnectionStatus: (isConnected: boolean) => void;
+  fetchPlayerCounts: () => Promise<void>;
 
   initialize: () => Promise<void>;
 }
@@ -48,6 +55,7 @@ interface GameStore {
 export const useGameStore = create<GameStore>((set, get) => ({
   currentGame: null,
   playerState: null,
+  allPlayerCounts: [],
   localGames: [],
   isLoading: false,
   currentPlayerId: null,
@@ -104,9 +112,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
         isLoading: false,
       });
 
+      // Fetch initial player counts
+      get().fetchPlayerCounts();
+
       const syncManager = getSyncManager();
       syncManager.connect(gameCode, {
-        onGameUpdate: (updatedGame) => get().handleRealtimeUpdate(updatedGame),
+        onGameUpdate: (updatedGame) => {
+          get().handleRealtimeUpdate(updatedGame);
+          // Fetch updated player counts when game updates
+          get().fetchPlayerCounts();
+        },
         onConnectionChange: (isConnected) =>
           get().setConnectionStatus(isConnected),
       });
@@ -222,6 +237,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
         persistPlayerState(updatedState.playerState),
         saveGameLocal(updatedState.currentGame),
       ]).catch(() => {});
+
+      // Fetch updated counts after marking
+      setTimeout(() => get().fetchPlayerCounts(), 500);
     }
   },
 
@@ -242,6 +260,23 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   setConnectionStatus: (isConnected: boolean) => {
     set({ isConnected });
+  },
+
+  fetchPlayerCounts: async () => {
+    const { currentGame } = get();
+    if (!currentGame) return;
+
+    try {
+      const response = await fetch(
+        `/api/game/${currentGame.gameCode}/player-counts`,
+      );
+      if (response.ok) {
+        const data = await response.json();
+        set({ allPlayerCounts: data.playerCounts || [] });
+      }
+    } catch (error) {
+      console.error("Failed to fetch player counts:", error);
+    }
   },
 
   initialize: async () => {
