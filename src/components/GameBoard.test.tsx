@@ -302,7 +302,7 @@ describe("GameBoard", () => {
       expect(button.className).toContain("font-medium");
     });
 
-    test("applies hover and active states for unmarked items", () => {
+    test("applies hover and active states for items without counts", () => {
       render(<GameBoard {...defaultProps} />);
 
       const button = screen.getAllByRole("button")[0];

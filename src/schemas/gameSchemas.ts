@@ -47,13 +47,7 @@ export const PlayerStateSchema = z.object({
 });
 
 export const GameEventSchema = z.object({
-  type: z.enum([
-    "PLAYER_JOINED",
-    "PLAYER_LEFT",
-    "ITEM_MARKED",
-    "ITEM_UNMARKED",
-    "GAME_RESET",
-  ]),
+  type: z.enum(["PLAYER_JOINED", "PLAYER_LEFT", "ITEM_MARKED", "GAME_RESET"]),
   timestamp: z.number().positive(),
   playerId: z.string().uuid().optional(),
   data: z.unknown().optional(),

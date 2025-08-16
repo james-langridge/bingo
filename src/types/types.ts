@@ -45,12 +45,6 @@ export interface Player {
 export type GameEvent =
   | { type: "ITEM_ADDED"; itemId: string; text: string; timestamp: number }
   | { type: "ITEM_MARKED"; itemId: string; playerId: string; timestamp: number }
-  | {
-      type: "ITEM_UNMARKED";
-      itemId: string;
-      playerId: string;
-      timestamp: number;
-    }
   | { type: "GAME_RESET"; timestamp: number }
   // NEW: Multiplayer events
   | { type: "PLAYER_JOINED"; player: Player; timestamp: number }

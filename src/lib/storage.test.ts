@@ -357,7 +357,7 @@ describe("storage", () => {
         timestamp: Date.now(),
       };
       const event2: GameEvent = {
-        type: "ITEM_UNMARKED",
+        type: "ITEM_MARKED",
         itemId: "item-2",
         playerId: "player-1",
         timestamp: Date.now(),
@@ -386,12 +386,6 @@ describe("storage", () => {
           playerId: "p1",
           timestamp: Date.now(),
         },
-        {
-          type: "ITEM_UNMARKED",
-          itemId: "1",
-          playerId: "p1",
-          timestamp: Date.now(),
-        },
         { type: "GAME_RESET", timestamp: Date.now() },
       ];
 
@@ -400,7 +394,7 @@ describe("storage", () => {
       }
 
       const stored = await db.pendingEvents.toArray();
-      expect(stored).toHaveLength(4);
+      expect(stored).toHaveLength(3);
     });
   });
 

@@ -14,7 +14,6 @@ export interface PlayerPayload {
   readonly joinedAt: number;
 }
 
-
 export interface ItemPayload {
   readonly item: BingoItem;
   readonly addedAt: number;
@@ -23,7 +22,6 @@ export interface ItemPayload {
 // Discriminated union for all game events
 export type GameEventV2 =
   | { readonly type: "ITEM_MARKED"; readonly payload: MarkPayload }
-  | { readonly type: "ITEM_UNMARKED"; readonly payload: MarkPayload }
   | { readonly type: "PLAYER_JOINED"; readonly payload: PlayerPayload }
   | { readonly type: "GAME_RESET"; readonly timestamp: number }
   | { readonly type: "ITEM_ADDED"; readonly payload: ItemPayload }
@@ -47,7 +45,6 @@ export function isPlayerJoinedEvent(
 ): event is Extract<GameEventV2, { type: "PLAYER_JOINED" }> {
   return event.type === "PLAYER_JOINED";
 }
-
 
 // Event handler type
 export type EventHandler<T extends GameEventV2 = GameEventV2> = (
