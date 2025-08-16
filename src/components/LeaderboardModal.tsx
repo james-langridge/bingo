@@ -24,18 +24,22 @@ export function LeaderboardModal({
   gameCode,
 }: LeaderboardModalProps) {
   const [playersData, setPlayersData] = useState<PlayerWithCounts[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
-  // Memoize player IDs to avoid re-fetching when only lastSeenAt changes
-  const playerIds = useMemo(() => {
-    return players.map((p) => p.id).join(",");
-  }, [players]);
+  // Reset hasLoaded when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setHasLoaded(false);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || hasLoaded) return;
 
     const fetchPlayerCounts = async () => {
       setLoading(true);
+      setHasLoaded(true);
 
       try {
         // Fetch counts for all players
@@ -122,7 +126,8 @@ export function LeaderboardModal({
     };
 
     fetchPlayerCounts();
-  }, [isOpen, playerIds, items, currentPlayerState, gameCode]); // Use playerIds instead of players
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, hasLoaded, gameCode]); // Only re-fetch when modal opens
 
   if (!isOpen) return null;
 
