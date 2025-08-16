@@ -2,8 +2,6 @@ import { memo } from "react";
 import type { BingoItem } from "../../types/types";
 import { BingoTile } from "./BingoTile";
 import { useGameBoard } from "../../hooks/useGameBoard";
-import { useResponsiveGrid } from "../../hooks/useResponsiveGrid";
-import { GRID_CONFIG } from "../../lib/constants";
 
 interface GameBoardProps {
   items: readonly BingoItem[];
@@ -24,22 +22,14 @@ export const GameBoard = memo(
     enableHaptic = true,
     currentPlayerId,
   }: GameBoardProps) => {
-    const { tileSizes, getMarkedByOthers } = useGameBoard({
+    const { getMarkedByOthers } = useGameBoard({
       items,
       currentPlayerId,
     });
-    const gridColumns = useResponsiveGrid();
 
     return (
       <>
-        <div
-          className="grid gap-3 p-4 w-full max-w-6xl mx-auto"
-          style={{
-            gridTemplateColumns: gridColumns,
-            gridAutoRows: GRID_CONFIG.AUTO_ROW_HEIGHT,
-            gridAutoFlow: "dense",
-          }}
-        >
+        <div className="flex flex-col gap-2 p-4 w-full max-w-2xl mx-auto">
           {items.map((item, index) => {
             const isMarkedByMe = markedPositions.includes(item.position);
             const markedByOthers = getMarkedByOthers(item);
@@ -48,7 +38,6 @@ export const GameBoard = memo(
               <BingoTile
                 key={`${item.id}-${index}`}
                 item={item}
-                tileSize={tileSizes[index]}
                 isMarkedByMe={isMarkedByMe}
                 markedByOthers={markedByOthers}
                 onClick={() => onItemClick(item.position)}

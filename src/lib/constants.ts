@@ -39,12 +39,12 @@ export const UI_CONFIG = {
 
 // Grid and tile configuration
 export const GRID_CONFIG = {
-  MOBILE_COLUMNS: 3, // 3 columns on mobile
-  TABLET_COLUMNS: 4, // 4 columns on tablet
-  DESKTOP_COLUMNS: 6, // 6 columns on desktop
-  WIDE_COLUMNS: 8, // 8 columns on wide screens
-  MIN_TILE_HEIGHT: 90, // 90px minimum tile height
-  AUTO_ROW_HEIGHT: "minmax(90px, auto)",
+  MOBILE_COLUMNS: 1, // Single column list on mobile
+  TABLET_COLUMNS: 1, // Single column on tablet
+  DESKTOP_COLUMNS: 1, // Single column on desktop
+  WIDE_COLUMNS: 1, // Single column on wide screens
+  MIN_TILE_HEIGHT: 80, // 80px minimum tile height
+  AUTO_ROW_HEIGHT: "minmax(80px, auto)",
 } as const;
 
 // Text length thresholds for tile sizing

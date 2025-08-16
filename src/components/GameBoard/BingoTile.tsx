@@ -1,6 +1,5 @@
 import { memo } from "react";
 import type { BingoItem } from "../../types/types";
-import type { TileSize } from "../../lib/gameboard/calculations";
 import {
   getTilePadding,
   getTileFontSize,
@@ -12,7 +11,6 @@ import { UI_CONFIG } from "../../lib/constants";
 
 interface BingoTileProps {
   item: BingoItem;
-  tileSize: TileSize;
   isMarkedByMe: boolean;
   markedByOthers: readonly {
     playerId: string;
@@ -26,7 +24,6 @@ interface BingoTileProps {
 export const BingoTile = memo(
   ({
     item,
-    tileSize,
     isMarkedByMe,
     markedByOthers,
     onClick,
@@ -42,8 +39,8 @@ export const BingoTile = memo(
       onClick();
     };
 
-    const padding = getTilePadding(tileSize, textLength);
-    const fontSize = getTileFontSize(tileSize, textLength);
+    const padding = getTilePadding(textLength);
+    const fontSize = getTileFontSize(textLength);
     const lineHeight = getTileLineHeight(textLength);
     const classes = getTileClasses(isMarkedByMe, isMarkedByAnyone);
 
@@ -53,30 +50,28 @@ export const BingoTile = memo(
         className={`${padding} ${classes}`}
         style={{
           animation: isMarkedByAnyone ? "pop 0.3s ease-out" : undefined,
-          gridColumn: `span ${tileSize.cols}`,
-          gridRow: `span ${tileSize.rows}`,
           fontSize,
           lineHeight,
         }}
       >
-        <span className="max-w-full overflow-wrap-anywhere relative z-10">
+        <span className="flex-1 px-2 relative z-10">
           {item.text || "(empty)"}
         </span>
 
         {/* Show who marked this square (excluding current player) */}
         {markedByOthers.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1 justify-center">
+          <div className="flex gap-1 items-center mr-2">
             {markedByOthers.slice(0, 3).map((mark, i) => (
               <span
                 key={i}
-                className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm text-xs font-bold"
+                className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white/20 backdrop-blur-sm text-xs font-bold"
                 title={`${mark.displayName} - ${new Date(mark.markedAt).toLocaleString()}`}
               >
                 {getInitials(mark.displayName)}
               </span>
             ))}
             {markedByOthers.length > 3 && (
-              <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm text-xs font-bold">
+              <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white/20 backdrop-blur-sm text-xs font-bold">
                 +{markedByOthers.length - 3}
               </span>
             )}
@@ -86,7 +81,7 @@ export const BingoTile = memo(
         {/* Add "Also saw this!" indicator if marked by others but not me */}
         {isMarkedByAnyone && !isMarkedByMe && (
           <div
-            className="absolute top-2 right-2 bg-yellow-400 text-yellow-900 rounded-full p-1"
+            className="flex items-center justify-center bg-yellow-400 text-yellow-900 rounded-full p-1.5 mr-2"
             title="Also saw this!"
           >
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -97,13 +92,6 @@ export const BingoTile = memo(
                 clipRule="evenodd"
               />
             </svg>
-          </div>
-        )}
-
-        {/* Add subtle pattern for large tiles */}
-        {(tileSize.cols > 1 || tileSize.rows > 1) && !isMarkedByAnyone && (
-          <div className="absolute inset-0 opacity-5 pointer-events-none">
-            <div className="w-full h-full bg-gradient-to-br from-purple-500 to-transparent" />
           </div>
         )}
       </button>

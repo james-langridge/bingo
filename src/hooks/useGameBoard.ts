@@ -1,10 +1,4 @@
-import { useMemo } from "react";
 import type { BingoItem } from "../types/types";
-import {
-  calculateTileSize,
-  generateTileSeed,
-  type TileSize,
-} from "../lib/gameboard/calculations";
 
 interface UseGameBoardProps {
   items: readonly BingoItem[];
@@ -12,7 +6,6 @@ interface UseGameBoardProps {
 }
 
 interface UseGameBoardReturn {
-  tileSizes: TileSize[];
   getMarkedByOthers: (item: BingoItem) => readonly {
     playerId: string;
     displayName: string;
@@ -21,20 +14,8 @@ interface UseGameBoardReturn {
 }
 
 export function useGameBoard({
-  items,
   currentPlayerId,
 }: UseGameBoardProps): UseGameBoardReturn {
-  const tileSizes = useMemo(() => {
-    return items.map((item, index) => {
-      if (!item?.text) {
-        return { cols: 1, rows: 1 };
-      }
-
-      const seed = generateTileSeed(item.text, index);
-      return calculateTileSize(item.text, seed);
-    });
-  }, [items]);
-
   const getMarkedByOthers = (item: BingoItem) => {
     const markedBy = item.markedBy || [];
     const others = currentPlayerId
@@ -50,7 +31,6 @@ export function useGameBoard({
   };
 
   return {
-    tileSizes,
     getMarkedByOthers,
   };
 }
