@@ -403,10 +403,6 @@ export function GamePlayer() {
               currentPlayerName={playerState?.displayName}
             />
           </ErrorBoundary>
-
-          <p className="text-center text-sm text-gray-600 mt-3 px-2">
-            Win condition: Mark all squares
-          </p>
         </div>
       </div>
 

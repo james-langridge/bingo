@@ -166,9 +166,7 @@ export function GameEditor() {
 
           <div className="border-t pt-4">
             <div className="flex items-center justify-between mb-2">
-              <h2 className="text-lg font-semibold">
-                Add Bingo Items ({items.length}/{maxItems})
-              </h2>
+              <h2 className="text-lg font-semibold">Add Bingo Items</h2>
               {isSaving && (
                 <span className="text-sm text-gray-500 animate-pulse">
                   Saving...
