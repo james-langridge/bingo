@@ -42,6 +42,7 @@ export const GameBoard = memo(
               .filter(
                 (pc) =>
                   pc.displayName !== currentPlayerName &&
+                  pc.itemCounts &&
                   pc.itemCounts[item.position] > 0,
               )
               .map((pc) => {

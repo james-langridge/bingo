@@ -273,6 +273,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
       if (response.ok) {
         const data = await response.json();
         set({ allPlayerCounts: data.playerCounts || [] });
+      } else {
+        console.error(
+          "Failed to fetch player counts, status:",
+          response.status,
+        );
       }
     } catch (error) {
       console.error("Failed to fetch player counts:", error);

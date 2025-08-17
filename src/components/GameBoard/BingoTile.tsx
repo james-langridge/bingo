@@ -1,7 +1,6 @@
 import { memo } from "react";
 import type { BingoItem, Player } from "../../types/types";
 import {
-  getTilePadding,
   getTileFontSize,
   getTileLineHeight,
   getTileClasses,
@@ -41,7 +40,6 @@ export const BingoTile = memo(
       onClick();
     };
 
-    const padding = getTilePadding(textLength);
     const fontSize = getTileFontSize(textLength);
     const lineHeight = getTileLineHeight(textLength);
     const classes = getTileClasses(isMarked, false);
@@ -49,31 +47,38 @@ export const BingoTile = memo(
     return (
       <button
         onClick={handleClick}
-        className={`${padding} ${classes} relative`}
+        className={`${classes} relative flex flex-col`}
         style={{
           animation: isMarked ? "pop 0.3s ease-out" : undefined,
-          fontSize,
-          lineHeight,
+          padding: "0.75rem",
         }}
       >
-        <span className="flex-1 px-1 relative z-10">
+        {/* Text content */}
+        <div
+          className="flex-1 flex items-center justify-center text-center"
+          style={{
+            fontSize,
+            lineHeight,
+          }}
+        >
           {item.text || "(empty)"}
-        </span>
+        </div>
 
-        {/* Show current player's count */}
-        {count > 0 && (
-          <div className="flex items-center justify-center bg-green-500 text-white rounded-full min-w-[28px] h-7 px-2 mr-2 font-bold text-sm">
-            {count}
-          </div>
-        )}
+        {/* Player indicators in bottom left below text */}
+        {(count > 0 || playerCounts.length > 0) && (
+          <div className="flex gap-1 flex-wrap mt-2">
+            {/* Current player's count (green) */}
+            {count > 0 && (
+              <div className="flex items-center justify-center bg-green-500 text-white rounded-full w-7 h-7 text-xs font-bold">
+                {count}
+              </div>
+            )}
 
-        {/* Show other players' indicators in bottom left */}
-        {playerCounts.length > 0 && (
-          <div className="absolute bottom-1 left-1 flex gap-1 flex-wrap max-w-[calc(100%-8px)]">
+            {/* Other players' indicators */}
             {playerCounts.map(({ player, count: playerCount, playerIndex }) => (
               <div
                 key={player.id}
-                className="flex items-center justify-center text-white rounded-full w-6 h-6 text-xs font-bold"
+                className="flex items-center justify-center text-white rounded-full w-7 h-7 text-xs font-bold"
                 style={{ backgroundColor: getPlayerColor(playerIndex) }}
                 title={`${player.displayName}: ${playerCount}`}
               >
