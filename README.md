@@ -247,6 +247,8 @@ The Fastify server provides the following endpoints:
 
 ## Testing
 
+### Unit Tests
+
 The project includes unit tests for core functionality:
 
 - `src/lib/calculations.test.ts` - Game logic tests
@@ -256,13 +258,28 @@ The project includes unit tests for core functionality:
 - `src/components/GameBoard.test.tsx` - Component tests
 - `src/components/ErrorBoundary.test.tsx` - Error boundary tests
 
-Run tests with:
+Run unit tests with:
 
 ```bash
 npm test              # Run all tests
 npm run test:ui       # Interactive test UI
 npm run test:coverage # Coverage report
 ```
+
+### E2E Tests
+
+End-to-end tests using Playwright verify multi-device synchronization:
+
+- `tests/e2e/sync.spec.ts` - Tests real-time synchronization between multiple players
+
+Run E2E tests with:
+
+```bash
+npm run test:e2e      # Run E2E tests
+npm run test:e2e:ui   # Run with Playwright UI for debugging
+```
+
+**Note**: E2E tests require both frontend and backend servers. The tests will automatically start them if not already running. For real-time synchronization features, Redis is optional - the server will fall back to polling mode if Redis is not available.
 
 ## Key Features
 

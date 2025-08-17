@@ -36,55 +36,121 @@ const upstash = new Redis({
   token: process.env.KV_REST_API_TOKEN,
 });
 
-// Redis for Pub/Sub (using Redis connection string)
-// For Railway/Fly, you'd use their Redis add-on
-const pubClient = new IORedis(
-  process.env.REDIS_URL || "redis://localhost:6379",
-);
-const subClient = pubClient.duplicate();
+// Redis for Pub/Sub (optional - falls back to polling if not available)
+let pubClient = null;
+let subClient = null;
+let redisAvailable = false;
+
+if (process.env.REDIS_URL) {
+  try {
+    pubClient = new IORedis(process.env.REDIS_URL, {
+      maxRetriesPerRequest: 3,
+      retryStrategy: (times) => {
+        if (times > 3) {
+          fastify.log.warn(
+            "Redis connection failed, falling back to polling mode",
+          );
+          return null; // Stop retrying
+        }
+        return Math.min(times * 100, 3000);
+      },
+    });
+    subClient = pubClient.duplicate();
+
+    // Test the connection
+    await pubClient.ping();
+    redisAvailable = true;
+    fastify.log.info("Redis pub/sub connected successfully");
+  } catch (error) {
+    fastify.log.warn(
+      "Redis not available, using polling fallback:",
+      error.message,
+    );
+    if (pubClient) pubClient.disconnect();
+    if (subClient) subClient.disconnect();
+    pubClient = null;
+    subClient = null;
+  }
+} else {
+  fastify.log.info(
+    "No REDIS_URL configured, using polling mode for real-time updates",
+  );
+}
 
 // Track active SSE connections per game
 const gameConnections = new Map(); // gameCode -> Set of response objects
 
-// Subscribe to Redis pub/sub channels
-subClient.on("message", async (channel, message) => {
-  if (channel.startsWith("game:")) {
-    const gameCode = channel.split(":")[1];
-    const connections = gameConnections.get(gameCode);
+// Subscribe to Redis pub/sub channels (if available)
+if (redisAvailable && subClient) {
+  subClient.on("message", async (channel, message) => {
+    if (channel.startsWith("game:")) {
+      const gameCode = channel.split(":")[1];
+      const connections = gameConnections.get(gameCode);
 
-    if (connections && connections.size > 0) {
-      // Parse the message to get the event type
-      const event = JSON.parse(message);
+      if (connections && connections.size > 0) {
+        // Parse the message to get the event type
+        const event = JSON.parse(message);
 
-      // Fetch the latest game state from Upstash
-      const gameData = await upstash.get(`game:${gameCode}`);
-      if (gameData) {
-        const game =
-          typeof gameData === "string" ? JSON.parse(gameData) : gameData;
+        // Fetch the latest game state from Upstash
+        const gameData = await upstash.get(`game:${gameCode}`);
+        if (gameData) {
+          const game =
+            typeof gameData === "string" ? JSON.parse(gameData) : gameData;
 
-        // Calculate online count
-        const now = Date.now();
-        const onlineCount =
-          game.players?.filter((p) => now - (p.lastSeenAt || 0) < 15000)
-            .length || 0;
+          // Calculate online count
+          const now = Date.now();
+          const onlineCount =
+            game.players?.filter((p) => now - (p.lastSeenAt || 0) < 15000)
+              .length || 0;
 
-        // Send to all connected clients
-        const data = JSON.stringify({
-          ...game,
-          onlineCount,
-          event: event.type,
-        });
-        connections.forEach((res) => {
-          res.raw.write(`data: ${data}\n\n`);
-        });
+          // Send to all connected clients
+          const data = JSON.stringify({
+            ...game,
+            onlineCount,
+            event: event.type,
+          });
+          connections.forEach((res) => {
+            res.raw.write(`data: ${data}\n\n`);
+          });
 
-        fastify.log.info(
-          `Broadcasted ${event.type} to ${connections.size} clients in game ${gameCode}`,
-        );
+          fastify.log.info(
+            `Broadcasted ${event.type} to ${connections.size} clients in game ${gameCode}`,
+          );
+        }
       }
     }
+  });
+}
+
+// Polling fallback for when Redis pub/sub is not available
+const gamePollingIntervals = new Map(); // gameCode -> intervalId
+
+async function broadcastGameUpdate(gameCode) {
+  const connections = gameConnections.get(gameCode);
+  if (!connections || connections.size === 0) return;
+
+  const gameData = await upstash.get(`game:${gameCode}`);
+  if (gameData) {
+    const game = typeof gameData === "string" ? JSON.parse(gameData) : gameData;
+
+    // Calculate online count
+    const now = Date.now();
+    const onlineCount =
+      game.players?.filter((p) => now - (p.lastSeenAt || 0) < 15000).length ||
+      0;
+
+    // Send to all connected clients
+    const data = JSON.stringify({
+      ...game,
+      onlineCount,
+      event: "update",
+    });
+
+    connections.forEach((res) => {
+      res.raw.write(`data: ${data}\n\n`);
+    });
   }
-});
+}
 
 // Health check endpoint
 fastify.get("/health", async (request, reply) => {
@@ -105,14 +171,23 @@ fastify.get("/api/game/events/:code", async (request, reply) => {
     "X-Accel-Buffering": "no",
   });
 
-  // Subscribe to this game's channel
-  await subClient.subscribe(`game:${code}`);
+  // Subscribe to this game's channel (if Redis is available)
+  if (redisAvailable && subClient) {
+    await subClient.subscribe(`game:${code}`);
+  }
 
   // Add this connection to the game's connection set
   if (!gameConnections.has(code)) {
     gameConnections.set(code, new Set());
   }
   gameConnections.get(code).add(reply);
+
+  // Start polling if Redis is not available
+  if (!redisAvailable && !gamePollingIntervals.has(code)) {
+    const intervalId = setInterval(() => broadcastGameUpdate(code), 2000);
+    gamePollingIntervals.set(code, intervalId);
+    fastify.log.info(`Started polling for game ${code}`);
+  }
 
   // Send initial game state
   const gameData = await upstash.get(`game:${code}`);
@@ -140,8 +215,20 @@ fastify.get("/api/game/events/:code", async (request, reply) => {
       connections.delete(reply);
       if (connections.size === 0) {
         gameConnections.delete(code);
-        subClient.unsubscribe(`game:${code}`);
-        fastify.log.info(`No more connections for game ${code}, unsubscribed`);
+
+        // Unsubscribe from Redis if available
+        if (redisAvailable && subClient) {
+          subClient.unsubscribe(`game:${code}`);
+        }
+
+        // Stop polling if no more connections
+        if (gamePollingIntervals.has(code)) {
+          clearInterval(gamePollingIntervals.get(code));
+          gamePollingIntervals.delete(code);
+          fastify.log.info(`Stopped polling for game ${code}`);
+        }
+
+        fastify.log.info(`No more connections for game ${code}, cleaned up`);
       }
     }
     clearInterval(heartbeatInterval);
@@ -210,14 +297,20 @@ fastify.post("/api/game/:code", async (request, reply) => {
       }
     }
 
-    // Publish to Redis pub/sub - this triggers SSE updates
-    await pubClient.publish(
-      `game:${code}`,
-      JSON.stringify({
-        type: eventType,
-        timestamp: Date.now(),
-      }),
-    );
+    // Publish to Redis pub/sub if available - this triggers SSE updates
+    if (redisAvailable && pubClient) {
+      await pubClient.publish(
+        `game:${code}`,
+        JSON.stringify({
+          type: eventType,
+          timestamp: Date.now(),
+        }),
+      );
+    } else {
+      // In polling mode, updates will be picked up automatically
+      // by the polling interval
+      fastify.log.debug(`Game ${code} updated, will be broadcast via polling`);
+    }
 
     fastify.log.info(`Game ${code} updated, event: ${eventType}`);
     return { success: true };

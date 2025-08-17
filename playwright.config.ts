@@ -6,11 +6,12 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: 1,
-  reporter: "list",
+  reporter: process.env.CI ? [["html"], ["list"]] : "list",
   use: {
     baseURL: "http://localhost:5173",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
+    video: process.env.CI ? "on-first-retry" : "off",
   },
 
   projects: [
