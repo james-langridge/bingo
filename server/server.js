@@ -297,6 +297,47 @@ fastify.post("/api/player/:code/heartbeat", async (request, reply) => {
   }
 });
 
+// Player sync endpoint - triggers broadcast when player marks items
+fastify.post("/api/player/:code/sync", async (request, reply) => {
+  const { code } = request.params;
+  const { playerId, itemCounts } = request.body;
+
+  try {
+    // Update player state in Redis
+    if (playerId && itemCounts) {
+      const playerState = await upstash.get(`player:${code}:${playerId}`);
+      if (playerState) {
+        const state =
+          typeof playerState === "string"
+            ? JSON.parse(playerState)
+            : playerState;
+        await upstash.set(
+          `player:${code}:${playerId}`,
+          JSON.stringify({ ...state, itemCounts }),
+          { ex: 7 * 24 * 60 * 60 },
+        );
+      }
+    }
+
+    // Broadcast update to all connected clients
+    await pubClient.publish(
+      `game:${code}`,
+      JSON.stringify({
+        type: "player-sync",
+        playerId,
+        timestamp: Date.now(),
+      }),
+    );
+
+    fastify.log.info(`Player ${playerId} synced in game ${code}`);
+    return { success: true };
+  } catch (error) {
+    fastify.log.error(error);
+    reply.code(500);
+    return { error: "Failed to sync player state" };
+  }
+});
+
 // Get game state
 fastify.get("/api/game/:code", async (request, reply) => {
   const { code } = request.params;

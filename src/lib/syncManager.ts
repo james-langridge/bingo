@@ -110,9 +110,10 @@ class SyncManager {
     };
 
     // Handle connection errors (automatic reconnection)
-    this.eventSource.onerror = () => {
+    this.eventSource.onerror = (error) => {
       console.log(
         `[SyncManager] Connection error, will auto-reconnect (attempt ${this.reconnectAttempts + 1})`,
+        error,
       );
 
       if (this.isConnected) {
@@ -122,8 +123,22 @@ class SyncManager {
 
       this.reconnectAttempts++;
 
-      // EventSource automatically reconnects with exponential backoff
-      // We just log it for debugging
+      // EventSource automatically reconnects, but if it fails too many times, recreate it
+      if (this.reconnectAttempts > 5) {
+        console.log(
+          `[SyncManager] Too many reconnect attempts, recreating connection`,
+        );
+        this.eventSource?.close();
+        this.eventSource = null;
+
+        // Try to recreate connection after delay
+        setTimeout(() => {
+          if (this.gameCode && !this.eventSource) {
+            this.reconnectAttempts = 0;
+            this.createConnection();
+          }
+        }, 5000);
+      }
     };
 
     // Handle explicit open event

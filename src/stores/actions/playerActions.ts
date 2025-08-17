@@ -24,11 +24,14 @@ export async function joinGame(
   const game = await loadGameByCode(gameCode);
   if (!game) throw new Error("Game not found");
 
-  const playerId = crypto.randomUUID();
-  const updatedGame = upsertPlayer(game, playerId, sanitizedName);
+  // Try to get existing playerId or generate new one
+  let playerId = localStorage.getItem(`playerId-${gameCode}`);
+  if (!playerId) {
+    playerId = crypto.randomUUID();
+    localStorage.setItem(`playerId-${gameCode}`, playerId);
+  }
 
-  // Store playerId for future syncs
-  localStorage.setItem(`playerId-${gameCode}`, playerId);
+  const updatedGame = upsertPlayer(game, playerId, sanitizedName);
 
   await saveGameLocal(updatedGame);
 

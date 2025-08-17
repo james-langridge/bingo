@@ -144,6 +144,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
         currentGame: game,
         isLoading: false,
       });
+
+      // Fetch player counts and connect to SSE
+      get().fetchPlayerCounts();
+
+      const syncManager = getSyncManager();
+      syncManager.connect(gameCode, {
+        onGameUpdate: (updatedGame) => get().handleRealtimeUpdate(updatedGame),
+        onConnectionChange: (isConnected) =>
+          get().setConnectionStatus(isConnected),
+      });
     } else {
       set({
         currentGame: null,
@@ -208,6 +218,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       onConnectionChange: (isConnected) =>
         get().setConnectionStatus(isConnected),
     });
+
+    // Fetch player counts immediately after joining
+    get().fetchPlayerCounts();
   },
 
   markPosition: (position) => {
@@ -238,8 +251,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
         saveGameLocal(updatedState.currentGame),
       ]).catch(() => {});
 
+      // Trigger a broadcast to notify other players
+      fetch(`/api/player/${updatedState.currentGame.gameCode}/sync`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          playerId: updatedState.currentPlayerId,
+          itemCounts: updatedState.playerState.itemCounts,
+        }),
+      }).catch(console.error);
+
       // Fetch updated counts after marking
-      setTimeout(() => get().fetchPlayerCounts(), 500);
+      setTimeout(() => get().fetchPlayerCounts(), 100);
     }
   },
 
@@ -256,6 +279,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({
       currentGame: updatedGame,
     });
+
+    // Also fetch updated player counts when game updates
+    get().fetchPlayerCounts();
   },
 
   setConnectionStatus: (isConnected: boolean) => {
