@@ -1,11 +1,10 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useGameStore } from "../stores/gameStore";
 import { GameBoard } from "./GameBoard";
 import { LoadingSkeleton } from "./LoadingSkeleton";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { ShareModal } from "./ShareModal";
-import { shuffleItems } from "../lib/calculations";
 import { getSyncManager } from "../lib/syncManager";
 
 export function GamePlayer() {
@@ -25,13 +24,6 @@ export function GamePlayer() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
-
-  // Deterministic shuffle - always call this hook, even if we don't use the result yet
-  const shuffledItems = useMemo(() => {
-    if (!currentGame || !playerState) return [];
-    const seed = `${currentGame.gameCode}-${playerState.displayName}`;
-    return shuffleItems(currentGame.items, seed);
-  }, [currentGame, playerState]);
 
   useEffect(() => {
     const initGame = async () => {
@@ -376,7 +368,7 @@ export function GamePlayer() {
             )}
           >
             <GameBoard
-              items={shuffledItems}
+              items={currentGame.items}
               itemCounts={playerState?.itemCounts || {}}
               onItemClick={markPosition}
               gridSize={currentGame.settings?.gridSize || 5}

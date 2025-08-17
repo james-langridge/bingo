@@ -45,7 +45,13 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: "./src/test/setup.ts",
     include: ["src/**/*.{test,spec}.{js,ts,jsx,tsx}"],
-    exclude: ["node_modules/**", "dist/**", "tests/e2e/**", "*.config.ts"],
+    exclude: [
+      "node_modules/**",
+      "dist/**",
+      "tests/**",
+      "*.config.ts",
+      "playwright.config.ts",
+    ],
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],

@@ -12,12 +12,12 @@ test.describe("Basic Game Flow", () => {
     // Wait for admin page (game creation goes directly to admin view)
     await page.waitForURL(/\/game\/.+\/admin\/.+/, { timeout: 10000 });
 
-    // Add a few items
+    // Add a few items - wait longer between adds to ensure saves complete
     const input = page.getByPlaceholder("Enter bingo item text...");
     for (let i = 0; i < 3; i++) {
       await input.fill(`Item ${i + 1}`);
       await input.press("Enter");
-      await page.waitForTimeout(200);
+      await page.waitForTimeout(1000); // Wait for save to complete
     }
 
     // Click Play Game to save and start playing
@@ -41,10 +41,10 @@ test.describe("Basic Game Flow", () => {
       timeout: 15000,
     });
 
-    // Verify tiles are visible (at least 2)
+    // Verify tiles are visible (should have 3 tiles)
     const tiles = page.locator('[data-testid="tile"]');
     const tileCount = await tiles.count();
-    expect(tileCount).toBeGreaterThanOrEqual(2);
+    expect(tileCount).toBe(3);
 
     // Click a tile
     const firstTile = tiles.first();
