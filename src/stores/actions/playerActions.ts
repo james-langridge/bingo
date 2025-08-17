@@ -31,19 +31,31 @@ export async function joinGame(
     localStorage.setItem(`playerId-${gameCode}`, playerId);
   }
 
-  const updatedGame = upsertPlayer(game, playerId, sanitizedName);
-
-  await saveGameLocal(updatedGame);
+  // Join game on server without overwriting other players
+  let updatedGame = game;
 
   if (navigator.onLine) {
     try {
-      await fetch(`/api/game/${gameCode}`, {
+      const response = await fetch(`/api/game/${gameCode}/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updatedGame),
+        body: JSON.stringify({ playerId, displayName: sanitizedName }),
       });
-    } catch (error) {}
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.game) {
+          updatedGame = data.game;
+        }
+      }
+    } catch (error) {
+      console.error("Failed to join game on server:", error);
+    }
   }
+
+  // Update local game with player info
+  updatedGame = upsertPlayer(updatedGame, playerId, sanitizedName);
+  await saveGameLocal(updatedGame);
 
   let playerState = await loadPlayerState(gameCode);
   if (!playerState || playerState.displayName !== sanitizedName) {

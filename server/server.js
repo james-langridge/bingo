@@ -152,7 +152,7 @@ fastify.get("/api/game/events/:code", async (request, reply) => {
 // Game state update endpoint
 fastify.post("/api/game/:code", async (request, reply) => {
   const { code } = request.params;
-  const game = request.body;
+  const clientGame = request.body;
 
   try {
     // Get existing game for comparison
@@ -162,6 +162,33 @@ fastify.post("/api/game/:code", async (request, reply) => {
         ? JSON.parse(existingData)
         : existingData
       : null;
+
+    // Merge players from both client and server to avoid overwrites
+    let game = clientGame;
+    if (existingGame && existingGame.players && clientGame.players) {
+      // Create a map of existing players by ID
+      const playerMap = new Map();
+
+      // Add all existing players from server
+      existingGame.players.forEach((player) => {
+        playerMap.set(player.id, player);
+      });
+
+      // Update or add players from client
+      clientGame.players.forEach((player) => {
+        // Only update if this player is newer or doesn't exist
+        const existing = playerMap.get(player.id);
+        if (!existing || player.lastSeenAt > existing.lastSeenAt) {
+          playerMap.set(player.id, player);
+        }
+      });
+
+      // Use merged players array
+      game = {
+        ...clientGame,
+        players: Array.from(playerMap.values()),
+      };
+    }
 
     // Save to Upstash
     await upstash.set(`game:${code}`, JSON.stringify(game), {
@@ -294,6 +321,69 @@ fastify.post("/api/player/:code/heartbeat", async (request, reply) => {
     fastify.log.error(error);
     reply.code(500);
     return { error: "Failed to update heartbeat" };
+  }
+});
+
+// Player join endpoint - adds player to game without overwriting others
+fastify.post("/api/game/:code/join", async (request, reply) => {
+  const { code } = request.params;
+  const { playerId, displayName } = request.body;
+
+  try {
+    const gameData = await upstash.get(`game:${code}`);
+    if (!gameData) {
+      reply.code(404);
+      return { error: "Game not found" };
+    }
+
+    const game = typeof gameData === "string" ? JSON.parse(gameData) : gameData;
+
+    // Add or update player
+    const existingPlayerIndex =
+      game.players?.findIndex((p) => p.id === playerId) ?? -1;
+
+    if (existingPlayerIndex >= 0) {
+      // Update existing player
+      game.players[existingPlayerIndex] = {
+        ...game.players[existingPlayerIndex],
+        displayName,
+        lastSeenAt: Date.now(),
+      };
+    } else {
+      // Add new player
+      if (!game.players) {
+        game.players = [];
+      }
+      game.players.push({
+        id: playerId,
+        displayName,
+        joinedAt: Date.now(),
+        lastSeenAt: Date.now(),
+      });
+    }
+
+    // Save updated game
+    await upstash.set(`game:${code}`, JSON.stringify(game), {
+      ex: 30 * 24 * 60 * 60,
+    });
+
+    // Broadcast player joined event
+    await pubClient.publish(
+      `game:${code}`,
+      JSON.stringify({
+        type: "player-joined",
+        playerId,
+        displayName,
+        timestamp: Date.now(),
+      }),
+    );
+
+    fastify.log.info(`Player ${displayName} joined game ${code}`);
+    return { success: true, game };
+  } catch (error) {
+    fastify.log.error(error);
+    reply.code(500);
+    return { error: "Failed to join game" };
   }
 });
 
