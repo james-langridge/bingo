@@ -6,23 +6,28 @@ test.describe("Multi-device Game Synchronization", () => {
   async function createGame(page: Page): Promise<string> {
     await page.goto("/");
 
+    // Fill in the game title on the home page
+    await page.getByPlaceholder(/Game Title/i).fill("Test Sync Game");
+
     // Click the Create Game button
     await page.getByRole("button", { name: /create game/i }).click();
 
-    // Fill in the game title
-    await page.getByPlaceholder("Game Title").fill("Test Sync Game");
+    // Wait for navigation to the admin page
+    await page.waitForURL(/\/game\/.+\/admin\/.+/, { timeout: 10000 });
 
     // Add some tiles
     for (let i = 0; i < 3; i++) {
-      await page.getByPlaceholder("New item...").fill(`Item ${i + 1}`);
-      await page.getByPlaceholder("New item...").press("Enter");
+      const input = page.getByPlaceholder("Enter bingo item text...");
+      await input.fill(`Item ${i + 1}`);
+      await input.press("Enter");
+      await page.waitForTimeout(500); // Give time for the item to be added
     }
 
-    // Save the game
-    await page.getByRole("button", { name: /save game/i }).click();
+    // Click Play Game to save and start playing
+    await page.getByRole("button", { name: /play game/i }).click();
 
     // Wait for the game code to appear in the URL
-    await page.waitForURL(/\/game\/.+/);
+    await page.waitForURL(/\/game\/.+/, { timeout: 10000 });
 
     // Extract the game code from the URL
     const url = page.url();
@@ -35,26 +40,32 @@ test.describe("Multi-device Game Synchronization", () => {
   async function joinGame(page: Page, code: string): Promise<void> {
     await page.goto(`/game/${code}`);
 
-    // Wait for the game to load
+    // Wait for the game to load - either join form or game board
+    await page.waitForSelector(
+      '[data-testid="game-board"], input[placeholder="Enter your name"]',
+      { timeout: 10000 },
+    );
+  }
+
+  async function enterPlayerName(page: Page, name: string): Promise<void> {
+    // Wait for and fill in the name input
+    const nameInput = page.getByPlaceholder("Enter your name");
+    await nameInput.waitFor({ state: "visible", timeout: 5000 });
+    await nameInput.fill(name);
+    await page.getByRole("button", { name: /join game/i }).click();
+
+    // Wait for the game board to appear
     await page.waitForSelector('[data-testid="game-board"]', {
       timeout: 10000,
     });
   }
 
-  async function enterPlayerName(page: Page, name: string): Promise<void> {
-    // Check if there's a name input dialog
-    const nameInput = page.getByPlaceholder("Enter your name");
-    if (await nameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await nameInput.fill(name);
-      await page.getByRole("button", { name: /start playing/i }).click();
-    }
-  }
-
   async function toggleTile(page: Page, tileText: string): Promise<void> {
     // Find and click the tile with the specified text
     const tile = page
-      .locator(`[data-testid="tile"]`)
+      .locator('[data-testid="tile"]')
       .filter({ hasText: tileText });
+    await tile.waitFor({ state: "visible", timeout: 5000 });
     await tile.click();
 
     // Wait a bit for the click to register
@@ -123,15 +134,15 @@ test.describe("Multi-device Game Synchronization", () => {
       await enterPlayerName(player2, "Player 2");
 
       // Wait for both players to be fully connected
-      await player1.waitForTimeout(2000);
-      await player2.waitForTimeout(2000);
+      await player1.waitForTimeout(1000);
+      await player2.waitForTimeout(1000);
 
       // Player 1 marks a tile
       console.log("Player 1 marking Item 1...");
       await toggleTile(player1, "Item 1");
 
-      // Wait for sync to happen (SSE update)
-      await player2.waitForTimeout(3000);
+      // Wait for sync to happen (polling happens every 2 seconds)
+      await player2.waitForTimeout(2500);
 
       // Check that Player 2 sees the tile as marked by Player 1
       console.log("Checking if Player 2 sees the update...");
@@ -143,7 +154,7 @@ test.describe("Multi-device Game Synchronization", () => {
       await toggleTile(player2, "Item 2");
 
       // Wait for sync
-      await player1.waitForTimeout(3000);
+      await player1.waitForTimeout(2500);
 
       // Check that Player 1 sees the tile marked by Player 2
       console.log("Checking if Player 1 sees Player 2's update...");
@@ -153,12 +164,12 @@ test.describe("Multi-device Game Synchronization", () => {
       // Both players mark the same tile
       console.log("Both players marking Item 3...");
       await toggleTile(player1, "Item 3");
-      await player2.waitForTimeout(2000);
+      await player2.waitForTimeout(2500);
       await toggleTile(player2, "Item 3");
 
       // Wait for sync
-      await player1.waitForTimeout(3000);
-      await player2.waitForTimeout(3000);
+      await player1.waitForTimeout(2500);
+      await player2.waitForTimeout(1000);
 
       // Check that both players see both marks on Item 3
       console.log("Checking if both players see both marks on Item 3...");
