@@ -2,21 +2,21 @@
 // Using visually distinct colors that work well on white backgrounds
 
 const PLAYER_COLORS = [
+  "#16A34A", // green-600 - Current player's color (kept first for consistency)
   "#DC2626", // red-600
   "#2563EB", // blue-600
-  "#16A34A", // green-600
-  "#9333EA", // purple-600
-  "#EA580C", // orange-600
-  "#0891B2", // cyan-600
-  "#DB2777", // pink-600
-  "#CA8A04", // yellow-700
-  "#0F766E", // teal-700
-  "#7C2D12", // amber-900
-  "#1E40AF", // blue-800
-  "#166534", // green-800
-  "#6B21A8", // purple-800
-  "#C2410C", // orange-800
-  "#BE185D", // pink-800
+  "#F59E0B", // amber-500 - Better contrast than previous yellows
+  "#8B5CF6", // violet-500 - More distinct from blue
+  "#EC4899", // pink-500 - Brighter pink
+  "#14B8A6", // teal-500 - Very different from green
+  "#F97316", // orange-500 - Brighter orange
+  "#6366F1", // indigo-500 - Different shade from blue
+  "#84CC16", // lime-500 - Lighter green, very different from main green
+  "#06B6D4", // cyan-500 - Distinct cyan
+  "#A855F7", // purple-500 - Bright purple
+  "#EF4444", // red-500 - Different red shade
+  "#3B82F6", // blue-500 - Different blue shade
+  "#10B981", // emerald-500 - Different green shade
 ] as const;
 
 /**

@@ -6,6 +6,7 @@ import { LoadingSkeleton } from "./LoadingSkeleton";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { ShareModal } from "./ShareModal";
 import { getSyncManager } from "../lib/syncManager";
+import { getPlayerColor } from "../lib/playerColors";
 
 export function GamePlayer() {
   const navigate = useNavigate();
@@ -323,27 +324,41 @@ export function GamePlayer() {
               <h3 className="text-sm font-semibold text-gray-700">Players</h3>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1">
-              {currentGame.players.map((player) => {
+              {currentGame.players.map((player, index) => {
                 // Calculate if player is online (lastSeenAt within 15 seconds)
                 const isOnline = Date.now() - (player.lastSeenAt || 0) < 15000;
+                const playerColor = getPlayerColor(index);
+                const isCurrentPlayer =
+                  player.displayName === playerState?.displayName;
 
                 return (
                   <div
                     key={player.id}
-                    className={`text-sm px-2 py-1 rounded ${
-                      player.displayName === playerState?.displayName
-                        ? "bg-blue-100 text-blue-700 font-semibold"
-                        : "bg-white text-gray-600"
+                    className={`text-sm px-2 py-1 rounded flex items-center ${
+                      isCurrentPlayer
+                        ? "ring-2 ring-blue-500 font-semibold"
+                        : ""
                     }`}
+                    style={{
+                      backgroundColor: playerColor + "20", // 20 is hex for ~12% opacity
+                      borderLeft: `3px solid ${playerColor}`,
+                    }}
                   >
-                    <div className="flex items-center">
+                    <div className="flex items-center flex-1">
                       {isOnline && (
                         <span
-                          className="w-2 h-2 bg-green-500 rounded-full mr-1"
+                          className="w-2 h-2 bg-green-500 rounded-full mr-1 flex-shrink-0"
                           title="Online now"
                         />
                       )}
-                      <span className="truncate">{player.displayName}</span>
+                      <span className="truncate" style={{ color: playerColor }}>
+                        {player.displayName}
+                      </span>
+                      {isCurrentPlayer && (
+                        <span className="ml-1 text-xs text-blue-600">
+                          (You)
+                        </span>
+                      )}
                     </div>
                   </div>
                 );
