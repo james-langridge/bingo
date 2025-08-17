@@ -68,11 +68,11 @@ export const BingoTile = memo(
         {/* Player indicators in bottom left below text */}
         {(count > 0 || playerCounts.length > 0) && (
           <div className="flex gap-1 flex-wrap mt-2">
-            {/* Current player's count (green) */}
+            {/* Current player's count (slate gray - neutral color distinct from all player colors) */}
             {count > 0 && (
               <div
                 data-testid="player-indicator"
-                className="flex items-center justify-center bg-green-500 text-white rounded-full w-7 h-7 text-xs font-bold"
+                className="flex items-center justify-center bg-slate-700 text-white rounded-full w-7 h-7 text-xs font-bold ring-2 ring-slate-500"
               >
                 {count}
               </div>
