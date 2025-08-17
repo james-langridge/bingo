@@ -54,13 +54,28 @@ describe("gameStore", () => {
 
     // Reset fetch mock for each test
     vi.mocked(global.fetch).mockReset();
-    // Default to successful responses
-    vi.mocked(global.fetch).mockResolvedValue(
-      new Response(JSON.stringify({ success: true }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
-    );
+    // Default to successful responses with proper URL handling
+    vi.mocked(global.fetch).mockImplementation((url) => {
+      const urlString = typeof url === "string" ? url : url.toString();
+
+      // Handle player-counts endpoint
+      if (urlString.includes("/player-counts")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ playerCounts: [] }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+
+      // Default response for other endpoints
+      return Promise.resolve(
+        new Response(JSON.stringify({ success: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    });
 
     // Set offline by default for tests (to use local storage only)
     Object.defineProperty(navigator, "onLine", {
