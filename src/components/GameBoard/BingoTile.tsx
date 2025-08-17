@@ -46,6 +46,7 @@ export const BingoTile = memo(
 
     return (
       <button
+        data-testid="tile"
         onClick={handleClick}
         className={`${classes} relative flex flex-col`}
         style={{
@@ -69,7 +70,10 @@ export const BingoTile = memo(
           <div className="flex gap-1 flex-wrap mt-2">
             {/* Current player's count (green) */}
             {count > 0 && (
-              <div className="flex items-center justify-center bg-green-500 text-white rounded-full w-7 h-7 text-xs font-bold">
+              <div
+                data-testid="player-indicator"
+                className="flex items-center justify-center bg-green-500 text-white rounded-full w-7 h-7 text-xs font-bold"
+              >
                 {count}
               </div>
             )}
@@ -78,10 +82,12 @@ export const BingoTile = memo(
             {playerCounts.map(({ player, count: playerCount, playerIndex }) => (
               <div
                 key={player.id}
+                data-testid="player-indicator"
                 className="flex items-center justify-center text-white rounded-full w-7 h-7 text-xs font-bold"
                 style={{ backgroundColor: getPlayerColor(playerIndex) }}
                 title={`${player.displayName}: ${playerCount}`}
               >
+                <span className="sr-only">{player.displayName}</span>
                 {playerCount}
               </div>
             ))}

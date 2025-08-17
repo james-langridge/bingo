@@ -33,7 +33,10 @@ export const GameBoard = memo(
   }: GameBoardProps) => {
     return (
       <>
-        <div className="flex flex-col gap-1.5 p-1 w-full max-w-2xl mx-auto">
+        <div
+          data-testid="game-board"
+          className="flex flex-col gap-1.5 p-1 w-full max-w-2xl mx-auto"
+        >
           {items.map((item, index) => {
             const count = itemCounts[item.position] || 0;
 
