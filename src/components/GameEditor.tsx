@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useGameStore } from "../stores/gameStore";
 import { ShareModal } from "./ShareModal";
@@ -16,7 +16,6 @@ export function GameEditor() {
   const [showShareModal, setShowShareModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
-  const lastServerItems = useRef<string>("");
 
   useEffect(() => {
     const loadGame = async () => {
@@ -38,16 +37,17 @@ export function GameEditor() {
     loadGame();
   }, [code, token, loadGameAsAdmin]);
 
+  // Initialize items from game when first loaded
   useEffect(() => {
-    if (currentGame) {
+    if (currentGame && items.length === 0) {
       // Check for template items
       const templateKey = `template_${currentGame.gameCode}`;
       const templateItems = localStorage.getItem(templateKey);
 
       if (templateItems && currentGame.items.length === 0) {
         // Use template items if game has no items yet
-        const items = JSON.parse(templateItems);
-        const bingoItems: BingoItem[] = items
+        const parsedItems = JSON.parse(templateItems);
+        const bingoItems: BingoItem[] = parsedItems
           .slice(0, 25)
           .map((text: string, index: number) => ({
             id: crypto.randomUUID(),
@@ -57,22 +57,19 @@ export function GameEditor() {
         setItems(bingoItems);
         localStorage.removeItem(templateKey);
       } else {
-        // Only update items if they're actually different from the server
-        // and we're not currently saving (to avoid flickering)
-        const serverItemsStr = JSON.stringify(currentGame.items);
-        if (!isSaving && serverItemsStr !== lastServerItems.current) {
-          setItems([...currentGame.items]);
-          lastServerItems.current = serverItemsStr;
-        }
+        // Initialize with current game items
+        setItems([...currentGame.items]);
       }
     }
-  }, [currentGame, isSaving]);
+  }, [currentGame]); // Only run when game first loads
 
-  // Cleanup SSE connection when leaving the editor
+  // Disconnect from SSE while editing - admin doesn't need real-time updates
   useEffect(() => {
+    const syncManager = getSyncManager();
+    syncManager.disconnect();
+    
     return () => {
-      const syncManager = getSyncManager();
-      syncManager.disconnect();
+      // Already disconnected, nothing to cleanup
     };
   }, []);
 
@@ -93,7 +90,6 @@ export function GameEditor() {
     // Auto-save the items immediately
     setIsSaving(true);
     await updateGameItems(updatedItems);
-    lastServerItems.current = JSON.stringify(updatedItems);
     setIsSaving(false);
   };
 
@@ -108,7 +104,6 @@ export function GameEditor() {
     // Auto-save the items immediately
     setIsSaving(true);
     await updateGameItems(updatedItems);
-    lastServerItems.current = JSON.stringify(updatedItems);
     setIsSaving(false);
   };
 
@@ -160,7 +155,6 @@ export function GameEditor() {
     // Auto-save the items
     setIsSaving(true);
     await updateGameItems(updatedItems);
-    lastServerItems.current = JSON.stringify(updatedItems);
     setIsSaving(false);
   };
 
