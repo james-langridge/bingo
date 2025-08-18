@@ -26,6 +26,7 @@
     "dexie": "^4.0.11",
     "framer-motion": "^12.23.12",
     "immer": "^10.1.1",
+    "lucide-react": "^0.540.0",
     "pino": "^9.8.0",
     "pino-pretty": "^13.1.1",
     "qrcode": "^1.5.4",

@@ -4,6 +4,7 @@ import { useGameStore } from "../stores/gameStore";
 // import { gameTemplates } from '../lib/templates';
 import { LoadingSkeleton } from "./LoadingSkeleton";
 import { getSyncManager } from "../lib/syncManager";
+import { InstallInstructions } from "./InstallInstructions";
 
 export function HomePage() {
   const navigate = useNavigate();
@@ -81,6 +82,8 @@ export function HomePage() {
         <h1 className="text-4xl font-bold text-center mb-8 text-gray-800">
           Bingo
         </h1>
+
+        <InstallInstructions />
 
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <h2 className="text-2xl font-semibold mb-4">Create New Game</h2>
