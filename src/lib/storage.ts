@@ -106,6 +106,12 @@ export async function saveGameLocal(game: Game): Promise<void> {
 
   await db.games.put(game);
 
+  // Store admin token in localStorage if present (for creator tracking)
+  if (game.adminToken) {
+    localStorage.setItem(`game:${game.gameCode}:adminToken`, game.adminToken);
+    localStorage.setItem(`game:${game.gameCode}:isCreator`, "true");
+  }
+
   syncGameToServer(game).then((success) => {
     if (!success && navigator.onLine) {
       queueEvent({
@@ -236,4 +242,13 @@ export async function processPendingEvents(): Promise<void> {
       await syncGameToServer(game);
     }
   }
+}
+
+// Helper functions for creator tracking
+export function isGameCreator(gameCode: string): boolean {
+  return localStorage.getItem(`game:${gameCode}:isCreator`) === "true";
+}
+
+export function getStoredAdminToken(gameCode: string): string | null {
+  return localStorage.getItem(`game:${gameCode}:adminToken`);
 }

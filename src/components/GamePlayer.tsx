@@ -16,6 +16,7 @@ export function GamePlayer() {
     playerState,
     currentPlayerId,
     allPlayerCounts,
+    isCreator,
     loadGame,
     joinGame,
     markPosition,
@@ -281,6 +282,30 @@ export function GamePlayer() {
               <h1 className="text-2xl font-bold">{currentGame.title}</h1>
             </div>
             <div className="flex gap-2">
+              {isCreator && currentGame.adminToken && (
+                <button
+                  onClick={() =>
+                    navigate(
+                      `/game/${code}/edit?token=${currentGame.adminToken}`,
+                    )
+                  }
+                  className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2 text-sm"
+                  aria-label="Edit Game"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  Edit
+                </button>
+              )}
               <button
                 onClick={() => navigate("/")}
                 className="p-2 rounded-lg hover:bg-gray-100 transition-colors"

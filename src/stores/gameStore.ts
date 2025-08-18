@@ -7,7 +7,12 @@ import type {
   BingoItem,
   PlayerItemCounts,
 } from "../types/types.ts";
-import { loadPlayerState, saveGameLocal } from "../lib/storage";
+import {
+  loadPlayerState,
+  saveGameLocal,
+  isGameCreator,
+  getStoredAdminToken,
+} from "../lib/storage";
 import { getSyncManager } from "../lib/syncManager";
 
 import {
@@ -31,10 +36,12 @@ interface GameStore {
     gameCode: string;
     adminToken?: string;
     title: string;
+    isCreator?: boolean;
   }[];
   isLoading: boolean;
   currentPlayerId: string | null;
   isConnected: boolean;
+  isCreator: boolean;
 
   createGame: (title: string) => Promise<Game>;
   loadGame: (gameCode: string) => Promise<void>;
@@ -60,6 +67,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   isLoading: false,
   currentPlayerId: null,
   isConnected: false,
+  isCreator: false,
 
   createGame: async (title) => {
     const game = await createGame(title);
@@ -71,7 +79,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
           gameCode: game.gameCode,
           adminToken: game.adminToken,
           title: game.title,
+          isCreator: true,
         });
+        draft.isCreator = true;
       }),
     );
     return game;
@@ -105,11 +115,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
         }
       }
 
+      // Check if user is the creator of this game
+      const creatorStatus = isGameCreator(gameCode);
+      const adminToken = getStoredAdminToken(gameCode);
+
+      // If we have a stored admin token, preserve it in the game
+      const gameWithAdmin = adminToken ? { ...game, adminToken } : game;
+
       set({
-        currentGame: game,
+        currentGame: gameWithAdmin,
         playerState: playerState || null,
         currentPlayerId: playerId,
         isLoading: false,
+        isCreator: creatorStatus,
       });
 
       // Fetch initial player counts
@@ -140,9 +158,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const game = await loadGame(gameCode);
 
     if (game && game.adminToken === adminToken) {
+      // Store admin token for future use
+      localStorage.setItem(`game:${gameCode}:adminToken`, adminToken);
+      localStorage.setItem(`game:${gameCode}:isCreator`, "true");
+
       set({
         currentGame: game,
         isLoading: false,
+        isCreator: true,
       });
 
       // Fetch player counts and connect to SSE
@@ -319,6 +342,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       gameCode: game.gameCode,
       adminToken: game.adminToken,
       title: game.title,
+      isCreator: isGameCreator(game.gameCode),
     }));
 
     set({

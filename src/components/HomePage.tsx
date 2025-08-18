@@ -134,7 +134,14 @@ export function HomePage() {
                   className="flex justify-between items-center p-3 border rounded-lg hover:bg-gray-50"
                 >
                   <div>
-                    <div className="font-medium">{game.title}</div>
+                    <div className="font-medium flex items-center gap-2">
+                      {game.title}
+                      {game.isCreator && (
+                        <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
+                          Creator
+                        </span>
+                      )}
+                    </div>
                     <div className="text-sm text-gray-500 font-mono">
                       Code: {game.gameCode}
                     </div>
@@ -146,7 +153,7 @@ export function HomePage() {
                     >
                       Play
                     </button>
-                    {game.adminToken && (
+                    {game.isCreator && game.adminToken && (
                       <button
                         onClick={() =>
                           navigate(
