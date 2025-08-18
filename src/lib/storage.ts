@@ -110,8 +110,14 @@ export async function saveGameLocal(game: Game): Promise<void> {
   // Note: adminToken should only be present when we created the game or accessed via admin URL
   // The server no longer sends adminToken in regular GET requests
   if (game.adminToken) {
-    localStorage.setItem(`game:${game.gameCode}:adminToken`, game.adminToken);
-    localStorage.setItem(`game:${game.gameCode}:isCreator`, "true");
+    // Only set if we don't already have a different token stored
+    const existingToken = localStorage.getItem(
+      `game:${game.gameCode}:adminToken`,
+    );
+    if (!existingToken || existingToken === game.adminToken) {
+      localStorage.setItem(`game:${game.gameCode}:adminToken`, game.adminToken);
+      localStorage.setItem(`game:${game.gameCode}:isCreator`, "true");
+    }
   }
 
   syncGameToServer(game).then((success) => {
@@ -248,9 +254,46 @@ export async function processPendingEvents(): Promise<void> {
 
 // Helper functions for creator tracking
 export function isGameCreator(gameCode: string): boolean {
+  // Deprecated - use getStoredAdminToken instead
   return localStorage.getItem(`game:${gameCode}:isCreator`) === "true";
 }
 
 export function getStoredAdminToken(gameCode: string): string | null {
   return localStorage.getItem(`game:${gameCode}:adminToken`);
+}
+
+// Clean up any incorrectly stored creator flags
+export async function cleanupCreatorFlags(): Promise<void> {
+  const games = await db.games.toArray();
+
+  for (const game of games) {
+    const storedAdminToken = getStoredAdminToken(game.gameCode);
+
+    // If we have a stored admin token but it doesn't match the game's admin token,
+    // or if we have isCreator flag but no admin token, clean it up
+    if (
+      storedAdminToken &&
+      game.adminToken &&
+      storedAdminToken !== game.adminToken
+    ) {
+      localStorage.removeItem(`game:${game.gameCode}:adminToken`);
+      localStorage.removeItem(`game:${game.gameCode}:isCreator`);
+    } else if (
+      !storedAdminToken &&
+      localStorage.getItem(`game:${game.gameCode}:isCreator`)
+    ) {
+      localStorage.removeItem(`game:${game.gameCode}:isCreator`);
+    }
+
+    // Also clean up games in IndexedDB that have adminToken but shouldn't
+    if (
+      game.adminToken &&
+      (!storedAdminToken || storedAdminToken !== game.adminToken)
+    ) {
+      // Remove adminToken from the game in IndexedDB by setting it to empty string
+      // (since it's a required field in the type)
+      const cleanGame = { ...game, adminToken: "" };
+      await db.games.put(cleanGame);
+    }
+  }
 }

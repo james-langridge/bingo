@@ -4,6 +4,7 @@ import {
   loadLocalGames,
   loadGameByCode,
   deleteGameLocal,
+  cleanupCreatorFlags,
 } from "../../lib/storage";
 import {
   createNewGame,
@@ -78,5 +79,7 @@ export async function deleteGame(gameId: string): Promise<void> {
  * Initialize and load all local games
  */
 export async function initializeGames(): Promise<Game[]> {
+  // Clean up any incorrectly stored creator flags first
+  await cleanupCreatorFlags();
   return await loadLocalGames();
 }

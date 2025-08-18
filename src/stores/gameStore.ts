@@ -10,7 +10,6 @@ import type {
 import {
   loadPlayerState,
   saveGameLocal,
-  isGameCreator,
   getStoredAdminToken,
 } from "../lib/storage";
 import { getSyncManager } from "../lib/syncManager";
@@ -116,8 +115,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
 
       // Check if user is the creator of this game
-      const creatorStatus = isGameCreator(gameCode);
       const adminToken = getStoredAdminToken(gameCode);
+      const creatorStatus = !!adminToken && game.adminToken === adminToken;
 
       // If we have a stored admin token, preserve it in the game
       const gameWithAdmin = adminToken ? { ...game, adminToken } : game;
@@ -337,13 +336,23 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({ isLoading: true });
 
     const games = await initializeGames();
-    const localGames = games.map((game) => ({
-      id: game.id,
-      gameCode: game.gameCode,
-      adminToken: game.adminToken,
-      title: game.title,
-      isCreator: isGameCreator(game.gameCode),
-    }));
+    const localGames = games.map((game) => {
+      // Only mark as creator if we have the admin token stored in localStorage
+      // AND it matches the game's adminToken
+      const storedAdminToken = getStoredAdminToken(game.gameCode);
+      const isCreator =
+        !!storedAdminToken &&
+        !!game.adminToken &&
+        storedAdminToken === game.adminToken;
+
+      return {
+        id: game.id,
+        gameCode: game.gameCode,
+        adminToken: isCreator ? storedAdminToken : undefined,
+        title: game.title,
+        isCreator,
+      };
+    });
 
     set({
       localGames,
