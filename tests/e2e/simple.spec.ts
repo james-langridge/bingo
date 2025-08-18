@@ -20,8 +20,8 @@ test.describe("Basic Game Flow", () => {
       await page.waitForTimeout(1000); // Wait for save to complete
     }
 
-    // Click Play Game to save and start playing
-    await page.getByRole("button", { name: /play game/i }).click();
+    // Click Start Game to start the game
+    await page.getByRole("button", { name: /start game/i }).click();
 
     // Should navigate to game page
     await page.waitForURL(/\/game\/.+/, { timeout: 10000 });

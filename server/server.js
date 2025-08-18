@@ -594,6 +594,126 @@ fastify.get("/api/game/:code/player-counts", async (request, reply) => {
   }
 });
 
+// Submit suggestion endpoint
+fastify.post("/api/game/:code/suggest", async (request, reply) => {
+  const { code } = request.params;
+  const { text, suggestedBy } = request.body;
+
+  try {
+    const gameData = await upstash.get(`game:${code}`);
+    if (!gameData) {
+      reply.code(404);
+      return { error: "Game not found" };
+    }
+
+    const game = typeof gameData === "string" ? JSON.parse(gameData) : gameData;
+
+    // Check if game has already started
+    if (game.isStarted) {
+      reply.code(400);
+      return { error: "Game has already started, suggestions are closed" };
+    }
+
+    // Create new suggestion
+    const suggestion = {
+      id: crypto.randomUUID(),
+      text: text.trim(),
+      suggestedBy,
+      timestamp: Date.now(),
+      isAdded: false,
+    };
+
+    // Add suggestion to game
+    if (!game.suggestions) {
+      game.suggestions = [];
+    }
+    game.suggestions.push(suggestion);
+
+    // Save updated game
+    await upstash.set(`game:${code}`, JSON.stringify(game), {
+      ex: 30 * 24 * 60 * 60,
+    });
+
+    // Broadcast update via Redis pub/sub or polling
+    if (redisAvailable && pubClient) {
+      await pubClient.publish(
+        `game:${code}`,
+        JSON.stringify({
+          type: "SUGGESTION_ADDED",
+          suggestion,
+          timestamp: Date.now(),
+        }),
+      );
+    }
+
+    return { success: true, suggestion };
+  } catch (error) {
+    fastify.log.error(`Error submitting suggestion for game ${code}:`, error);
+    reply.code(500);
+    return { error: "Failed to submit suggestion" };
+  }
+});
+
+// Start game endpoint (admin only)
+fastify.post("/api/game/:code/start", async (request, reply) => {
+  const { code } = request.params;
+  const { adminToken } = request.body;
+
+  try {
+    const gameData = await upstash.get(`game:${code}`);
+    if (!gameData) {
+      reply.code(404);
+      return { error: "Game not found" };
+    }
+
+    const game = typeof gameData === "string" ? JSON.parse(gameData) : gameData;
+
+    // Verify admin token
+    if (!adminToken || game.adminToken !== adminToken) {
+      reply.code(403);
+      return { error: "Invalid admin token" };
+    }
+
+    // Check if game already started
+    if (game.isStarted) {
+      return { success: false, message: "Game has already been started" };
+    }
+
+    // Check if there's at least one item
+    if (!game.items || game.items.length === 0) {
+      reply.code(400);
+      return { error: "Cannot start game with no items" };
+    }
+
+    // Start the game
+    game.isStarted = true;
+    game.lastModifiedAt = Date.now();
+
+    // Save updated game
+    await upstash.set(`game:${code}`, JSON.stringify(game), {
+      ex: 30 * 24 * 60 * 60,
+    });
+
+    // Broadcast game started event
+    if (redisAvailable && pubClient) {
+      await pubClient.publish(
+        `game:${code}`,
+        JSON.stringify({
+          type: "GAME_STARTED",
+          timestamp: Date.now(),
+        }),
+      );
+    }
+
+    fastify.log.info(`Game ${code} started by admin`);
+    return { success: true, game };
+  } catch (error) {
+    fastify.log.error(`Error starting game ${code}:`, error);
+    reply.code(500);
+    return { error: "Failed to start game" };
+  }
+});
+
 // Claim win endpoint
 fastify.post("/api/game/:code/claim-win", async (request, reply) => {
   const { code } = request.params;

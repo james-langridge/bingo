@@ -41,6 +41,7 @@ const mockGame: Game = {
   createdAt: Date.now(),
   lastModifiedAt: Date.now(),
   players: [],
+  isStarted: false,
 };
 
 const mockPlayerState: PlayerState = {

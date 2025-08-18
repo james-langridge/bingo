@@ -15,6 +15,8 @@ export function createNewGame(title: string): Game {
     createdAt: Date.now(),
     lastModifiedAt: Date.now(),
     players: [],
+    isStarted: false,
+    suggestions: [],
   };
 }
 

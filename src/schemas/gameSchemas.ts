@@ -24,6 +24,14 @@ export const PlayerSchema = z.object({
   isOnline: z.boolean().optional(),
 });
 
+export const GameSuggestionSchema = z.object({
+  id: z.string().uuid(),
+  text: z.string().min(1).max(500),
+  suggestedBy: z.string().min(1).max(50),
+  timestamp: z.number().positive(),
+  isAdded: z.boolean().optional(),
+});
+
 export const GameSchema = z.object({
   id: z.string().uuid(),
   adminToken: z
@@ -37,6 +45,8 @@ export const GameSchema = z.object({
   createdAt: z.number().positive(),
   lastModifiedAt: z.number().positive(),
   players: z.array(PlayerSchema),
+  isStarted: z.boolean().default(false),
+  suggestions: z.array(GameSuggestionSchema).optional(),
 });
 
 export const PlayerStateSchema = z.object({
@@ -47,7 +57,14 @@ export const PlayerStateSchema = z.object({
 });
 
 export const GameEventSchema = z.object({
-  type: z.enum(["PLAYER_JOINED", "PLAYER_LEFT", "ITEM_MARKED", "GAME_RESET"]),
+  type: z.enum([
+    "PLAYER_JOINED",
+    "PLAYER_LEFT",
+    "ITEM_MARKED",
+    "GAME_RESET",
+    "SUGGESTION_ADDED",
+    "GAME_STARTED",
+  ]),
   timestamp: z.number().positive(),
   playerId: z.string().uuid().optional(),
   data: z.unknown().optional(),
@@ -72,6 +89,15 @@ export const JoinGameRequestSchema = z.object({
 
 export const MarkPositionRequestSchema = z.object({
   position: z.number().min(0),
+});
+
+export const SubmitSuggestionRequestSchema = z.object({
+  text: z.string().min(1).max(500),
+  suggestedBy: z.string().min(1).max(50),
+});
+
+export const StartGameRequestSchema = z.object({
+  adminToken: z.string().regex(/^[a-z0-9]{32}$/),
 });
 
 export const GameChangesResponseSchema = z.object({

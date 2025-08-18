@@ -31,8 +31,8 @@ test.describe("Simple Sync Test", () => {
       const gameCode = match[1];
       console.log(`Game created with code: ${gameCode}`);
 
-      // Player 1 clicks Play Game
-      await player1.getByRole("button", { name: /play game/i }).click();
+      // Player 1 clicks Start Game
+      await player1.getByRole("button", { name: /start game/i }).click();
 
       // Player 1 enters name
       await player1.getByPlaceholder("Enter your name").fill("Player 1");

@@ -8,6 +8,95 @@ import { ShareModal } from "./ShareModal";
 import { getSyncManager } from "../lib/syncManager";
 import { getPlayerColor } from "../lib/playerColors";
 
+// Component for suggestion input in waiting room
+function WaitingRoomSuggestions({
+  gameCode,
+  playerName,
+}: {
+  gameCode: string;
+  playerName: string;
+}) {
+  const [suggestionText, setSuggestionText] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState<string[]>([]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!suggestionText.trim() || isSubmitting) return;
+
+    setIsSubmitting(true);
+    try {
+      const response = await fetch(`/api/game/${gameCode}/suggest`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: suggestionText.trim(),
+          suggestedBy: playerName,
+        }),
+      });
+
+      if (response.ok) {
+        setSubmitted([...submitted, suggestionText.trim()]);
+        setSuggestionText("");
+
+        // Show confirmation briefly
+        setTimeout(() => {
+          // Could add visual feedback here
+        }, 2000);
+      }
+    } catch (error) {
+      console.error("Failed to submit suggestion:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-lg font-semibold mb-2">💡 Suggest bingo items</h3>
+        <p className="text-sm text-gray-600 mb-3">
+          Help create the game by suggesting items while you wait!
+        </p>
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <input
+            type="text"
+            placeholder="Enter a bingo item suggestion..."
+            value={suggestionText}
+            onChange={(e) => setSuggestionText(e.target.value)}
+            className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none"
+            maxLength={500}
+            disabled={isSubmitting}
+          />
+          <button
+            type="submit"
+            disabled={isSubmitting || !suggestionText.trim()}
+            className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+          >
+            {isSubmitting ? "Submitting..." : "Submit Suggestion"}
+          </button>
+        </form>
+      </div>
+
+      {submitted.length > 0 && (
+        <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+          <p className="text-sm text-green-700 font-medium">
+            ✓ Your suggestions have been sent to the host!
+          </p>
+          <div className="mt-2 space-y-1">
+            {submitted.map((text, index) => (
+              <div key={index} className="text-sm text-gray-600">
+                • {text}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function GamePlayer() {
   const navigate = useNavigate();
   const { code } = useParams<{ code: string }>();
@@ -251,22 +340,32 @@ export function GamePlayer() {
     );
   }
 
-  // Check if there are enough items for the game
-  if (currentGame.items.length === 0) {
+  // Show waiting screen if game hasn't started yet
+  if (!currentGame.isStarted) {
     return (
       <div className="min-h-screen bg-gray-100 py-4">
         <div className="container mx-auto px-3 max-w-lg">
-          <div className="bg-white rounded-lg shadow-md p-6 text-center">
-            <h1 className="text-2xl font-bold mb-2">{currentGame.title}</h1>
-            <p className="text-gray-600 mb-4">
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h1 className="text-2xl font-bold mb-2 text-center">
+              {currentGame.title}
+            </h1>
+            <p className="text-gray-600 mb-6 text-center">
               Game Code: <span className="font-mono font-bold">{code}</span>
             </p>
-            <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-4">
-              <p className="text-lg">Waiting for game to be set up...</p>
+
+            <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-4 mb-6">
+              <p className="text-lg font-medium">
+                ⏳ Waiting for game to start...
+              </p>
               <p className="text-sm text-gray-600 mt-2">
-                The game organizer needs to add bingo items before you can play.
+                The host is setting up the bingo items.
               </p>
             </div>
+
+            <WaitingRoomSuggestions
+              gameCode={code || ""}
+              playerName={playerState.displayName}
+            />
           </div>
         </div>
       </div>

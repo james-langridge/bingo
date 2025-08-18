@@ -15,6 +15,7 @@ export function GameEditor() {
   const [error, setError] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
 
   useEffect(() => {
     const loadGame = async () => {
@@ -106,6 +107,53 @@ export function GameEditor() {
     setShowShareModal(true);
   };
 
+  const handleStartGame = async () => {
+    if (!currentGame || isStarting) return;
+
+    setIsStarting(true);
+    try {
+      const response = await fetch(`/api/game/${code}/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminToken: token }),
+      });
+
+      if (response.ok) {
+        // Navigate to the game page
+        navigate(`/game/${code}`);
+      } else {
+        console.error("Failed to start game");
+      }
+    } catch (error) {
+      console.error("Error starting game:", error);
+    } finally {
+      setIsStarting(false);
+    }
+  };
+
+  const handleAddSuggestion = async (suggestionText: string) => {
+    if (isSaving) return;
+
+    const newItem: BingoItem = {
+      id: crypto.randomUUID(),
+      text: suggestionText,
+      position: items.length,
+    };
+
+    const updatedItems = [...items, newItem];
+    setItems(updatedItems);
+
+    // Mark suggestion as added (locally for UI feedback)
+    if (currentGame?.suggestions) {
+      // This is just for local UI state, the server tracks the actual state
+    }
+
+    // Auto-save the items
+    setIsSaving(true);
+    await updateGameItems(updatedItems);
+    setIsSaving(false);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -141,6 +189,11 @@ export function GameEditor() {
               <p className="text-gray-600">
                 Game Code: <span className="font-mono font-bold">{code}</span>
               </p>
+              {!currentGame?.isStarted && (
+                <p className="text-sm text-orange-600 mt-1">
+                  ⚠️ Game not started yet - players are waiting
+                </p>
+              )}
             </div>
             <div className="flex gap-2">
               <button
@@ -155,18 +208,66 @@ export function GameEditor() {
               >
                 Share Game
               </button>
-              <button
-                onClick={() => navigate(`/game/${code}`)}
-                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
-              >
-                Play Game
-              </button>
+              {!currentGame?.isStarted ? (
+                <button
+                  onClick={handleStartGame}
+                  disabled={items.length === 0 || isStarting}
+                  className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold flex items-center gap-2"
+                >
+                  {isStarting ? "Starting..." : "🚀 Start Game"}
+                </button>
+              ) : (
+                <button
+                  onClick={() => navigate(`/game/${code}`)}
+                  className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+                >
+                  Play Game
+                </button>
+              )}
             </div>
           </div>
 
+          {/* Suggestions panel - only show if game not started and has suggestions */}
+          {!currentGame?.isStarted &&
+            currentGame?.suggestions &&
+            currentGame.suggestions.length > 0 && (
+              <div className="border-t pt-4 mb-4">
+                <h2 className="text-lg font-semibold mb-3">
+                  📝 Player Suggestions
+                </h2>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2 max-h-64 overflow-y-auto">
+                  {currentGame.suggestions.map((suggestion) => (
+                    <div
+                      key={suggestion.id}
+                      className="flex items-center justify-between p-2 bg-white rounded border"
+                    >
+                      <div className="flex-1">
+                        <span className="font-medium">{suggestion.text}</span>
+                        <span className="text-sm text-gray-500 ml-2">
+                          - {suggestion.suggestedBy}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => handleAddSuggestion(suggestion.text)}
+                        disabled={
+                          isSaving ||
+                          items.some((item) => item.text === suggestion.text)
+                        }
+                        className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm disabled:bg-gray-400 disabled:cursor-not-allowed"
+                      >
+                        {items.some((item) => item.text === suggestion.text)
+                          ? "✓ Added"
+                          : "Add"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
           <div className="border-t pt-4">
             <div className="flex items-center justify-between mb-2">
-              <h2 className="text-lg font-semibold">Add Bingo Items</h2>
+              <h2 className="text-lg font-semibold">Bingo Items</h2>
               {isSaving && (
                 <span className="text-sm text-gray-500 animate-pulse">
                   Saving...

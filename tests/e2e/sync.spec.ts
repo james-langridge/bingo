@@ -23,8 +23,8 @@ test.describe("Multi-device Game Synchronization", () => {
       await page.waitForTimeout(500); // Give time for the item to be added
     }
 
-    // Click Play Game to save and start playing
-    await page.getByRole("button", { name: /play game/i }).click();
+    // Click Start Game to save and start playing
+    await page.getByRole("button", { name: /start game/i }).click();
 
     // Wait for the game code to appear in the URL
     await page.waitForURL(/\/game\/.+/, { timeout: 10000 });
@@ -292,8 +292,8 @@ test.describe("Multi-device Game Synchronization", () => {
       await input.press("Enter");
       await player1.waitForTimeout(1000); // Wait for save to complete
 
-      // Click Play Game
-      await player1.getByRole("button", { name: /play game/i }).click();
+      // Click Start Game
+      await player1.getByRole("button", { name: /start game/i }).click();
 
       // Get game code from URL
       await player1.waitForURL(/\/game\/.+/, { timeout: 10000 });

@@ -11,6 +11,17 @@ export interface Game {
   readonly lastModifiedAt: number;
   // Multiplayer fields
   readonly players: readonly Player[];
+  // Game state
+  readonly isStarted: boolean; // false until admin clicks "Start Game"
+  readonly suggestions?: readonly GameSuggestion[];
+}
+
+export interface GameSuggestion {
+  readonly id: string;
+  readonly text: string;
+  readonly suggestedBy: string; // Player display name
+  readonly timestamp: number;
+  readonly isAdded?: boolean; // Track if admin added this as an item
 }
 
 export interface BingoItem {
@@ -60,4 +71,7 @@ export type GameEvent =
       playerId: string;
       lastActiveAt: number;
       timestamp: number;
-    };
+    }
+  // Suggestion and game start events
+  | { type: "SUGGESTION_ADDED"; suggestion: GameSuggestion; timestamp: number }
+  | { type: "GAME_STARTED"; timestamp: number };
