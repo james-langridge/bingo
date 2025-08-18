@@ -107,6 +107,8 @@ export async function saveGameLocal(game: Game): Promise<void> {
   await db.games.put(game);
 
   // Store admin token in localStorage if present (for creator tracking)
+  // Note: adminToken should only be present when we created the game or accessed via admin URL
+  // The server no longer sends adminToken in regular GET requests
   if (game.adminToken) {
     localStorage.setItem(`game:${game.gameCode}:adminToken`, game.adminToken);
     localStorage.setItem(`game:${game.gameCode}:isCreator`, "true");

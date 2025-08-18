@@ -67,7 +67,7 @@ export function GameEditor() {
   useEffect(() => {
     const syncManager = getSyncManager();
     syncManager.disconnect();
-    
+
     return () => {
       // Already disconnected, nothing to cleanup
     };

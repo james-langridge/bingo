@@ -105,8 +105,10 @@ if (redisAvailable && subClient) {
               .length || 0;
 
           // Send to all connected clients
+          // Never send adminToken via SSE
+          const { adminToken, ...safeGame } = game;
           const data = JSON.stringify({
-            ...game,
+            ...safeGame,
             onlineCount,
             event: event.type,
           });
@@ -141,8 +143,10 @@ async function broadcastGameUpdate(gameCode) {
       0;
 
     // Send to all connected clients
+    // Never send adminToken via SSE
+    const { adminToken, ...safeGame } = game;
     const data = JSON.stringify({
-      ...game,
+      ...safeGame,
       onlineCount,
       event: "update",
     });
@@ -199,7 +203,11 @@ fastify.get("/api/game/events/:code", async (request, reply) => {
       game.players?.filter((p) => now - (p.lastSeenAt || 0) < 15000).length ||
       0;
 
-    reply.raw.write(`data: ${JSON.stringify({ ...game, onlineCount })}\n\n`);
+    // Never send adminToken via SSE
+    const { adminToken, ...safeGame } = game;
+    reply.raw.write(
+      `data: ${JSON.stringify({ ...safeGame, onlineCount })}\n\n`,
+    );
   } else {
     reply.raw.write(`data: {"error":"Game not found"}\n\n`);
   }
@@ -541,7 +549,9 @@ fastify.get("/api/game/:code", async (request, reply) => {
     }
 
     const game = typeof gameData === "string" ? JSON.parse(gameData) : gameData;
-    return game;
+    // Never send adminToken to clients
+    const { adminToken, ...safeGame } = game;
+    return safeGame;
   } catch (error) {
     fastify.log.error(error);
     reply.code(500);
