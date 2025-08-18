@@ -253,28 +253,35 @@ fastify.post("/api/game/:code", async (request, reply) => {
 
     // Merge players from both client and server to avoid overwrites
     let game = clientGame;
-    if (existingGame && existingGame.players && clientGame.players) {
+    if (existingGame) {
       // Create a map of existing players by ID
       const playerMap = new Map();
 
       // Add all existing players from server
-      existingGame.players.forEach((player) => {
-        playerMap.set(player.id, player);
-      });
+      if (existingGame.players) {
+        existingGame.players.forEach((player) => {
+          playerMap.set(player.id, player);
+        });
+      }
 
       // Update or add players from client
-      clientGame.players.forEach((player) => {
-        // Only update if this player is newer or doesn't exist
-        const existing = playerMap.get(player.id);
-        if (!existing || player.lastSeenAt > existing.lastSeenAt) {
-          playerMap.set(player.id, player);
-        }
-      });
+      if (clientGame.players) {
+        clientGame.players.forEach((player) => {
+          // Only update if this player is newer or doesn't exist
+          const existing = playerMap.get(player.id);
+          if (!existing || player.lastSeenAt > existing.lastSeenAt) {
+            playerMap.set(player.id, player);
+          }
+        });
+      }
 
-      // Use merged players array
+      // Merge game data, preserving server-only fields like suggestions and isStarted
       game = {
         ...clientGame,
         players: Array.from(playerMap.values()),
+        // Preserve server-only fields that shouldn't be overwritten by client
+        suggestions: existingGame.suggestions || [],
+        isStarted: existingGame.isStarted || false,
       };
     }
 
