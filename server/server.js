@@ -49,6 +49,7 @@ async function connectWithRetry(maxRetries = 10, delayMs = 2000) {
       const client = new IORedis(process.env.REDIS_URL, {
         maxRetriesPerRequest: 3,
         lazyConnect: true,
+        family: 0, // Allow both IPv4 and IPv6 (required for Railway internal networking)
         retryStrategy: (times) => {
           if (times > 3) return null;
           return Math.min(times * 100, 3000);
