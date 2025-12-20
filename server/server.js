@@ -1,6 +1,5 @@
 import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
-import { Redis } from "@upstash/redis";
 import IORedis from "ioredis";
 import dotenv from "dotenv";
 import path from "path";
@@ -31,131 +30,79 @@ await fastify.register(fastifyStatic, {
   wildcard: false, // prevents auto /* registration
 });
 
-// Upstash Redis for data storage
-const upstash = new Redis({
-  url: process.env.KV_REST_API_URL,
-  token: process.env.KV_REST_API_TOKEN,
-});
-
-// Redis for Pub/Sub (optional - falls back to polling if not available)
+// Redis connection - used for both data storage and pub/sub
+let redis = null;
 let pubClient = null;
 let subClient = null;
-let redisAvailable = false;
 
-if (process.env.REDIS_URL) {
-  try {
-    pubClient = new IORedis(process.env.REDIS_URL, {
-      maxRetriesPerRequest: 3,
-      retryStrategy: (times) => {
-        if (times > 3) {
-          fastify.log.warn(
-            "Redis connection failed, falling back to polling mode",
-          );
-          return null; // Stop retrying
-        }
-        return Math.min(times * 100, 3000);
-      },
-    });
-    subClient = pubClient.duplicate();
+if (!process.env.REDIS_URL) {
+  fastify.log.error("REDIS_URL is required");
+  process.exit(1);
+}
 
-    // Test the connection
-    await pubClient.ping();
-    redisAvailable = true;
-    fastify.log.info("Redis pub/sub connected successfully");
-  } catch (error) {
-    fastify.log.warn(
-      "Redis not available, using polling fallback:",
-      error.message,
-    );
-    if (pubClient) pubClient.disconnect();
-    if (subClient) subClient.disconnect();
-    pubClient = null;
-    subClient = null;
-  }
-} else {
-  fastify.log.info(
-    "No REDIS_URL configured, using polling mode for real-time updates",
-  );
+try {
+  redis = new IORedis(process.env.REDIS_URL, {
+    maxRetriesPerRequest: 3,
+    retryStrategy: (times) => {
+      if (times > 5) {
+        fastify.log.error("Redis connection failed after 5 retries");
+        return null;
+      }
+      return Math.min(times * 100, 3000);
+    },
+  });
+
+  // Separate connections for pub/sub (required by Redis)
+  pubClient = redis.duplicate();
+  subClient = redis.duplicate();
+
+  // Test the connection
+  await redis.ping();
+  fastify.log.info("Redis connected successfully");
+} catch (error) {
+  fastify.log.error("Failed to connect to Redis:", error.message);
+  process.exit(1);
 }
 
 // Track active SSE connections per game
 const gameConnections = new Map(); // gameCode -> Set of response objects
 
-// Subscribe to Redis pub/sub channels (if available)
-if (redisAvailable && subClient) {
-  subClient.on("message", async (channel, message) => {
-    if (channel.startsWith("game:")) {
-      const gameCode = channel.split(":")[1];
-      const connections = gameConnections.get(gameCode);
+// Subscribe to Redis pub/sub channels
+subClient.on("message", async (channel, message) => {
+  if (channel.startsWith("game:")) {
+    const gameCode = channel.split(":")[1];
+    const connections = gameConnections.get(gameCode);
 
-      if (connections && connections.size > 0) {
-        // Parse the message to get the event type
-        const event = JSON.parse(message);
+    if (connections && connections.size > 0) {
+      const event = JSON.parse(message);
 
-        // Fetch the latest game state from Upstash
-        const gameData = await upstash.get(`game:${gameCode}`);
-        if (gameData) {
-          const game =
-            typeof gameData === "string" ? JSON.parse(gameData) : gameData;
+      const gameData = await redis.get(`game:${gameCode}`);
+      if (gameData) {
+        const game = JSON.parse(gameData);
 
-          // Calculate online count
-          const now = Date.now();
-          const onlineCount =
-            game.players?.filter((p) => now - (p.lastSeenAt || 0) < 15000)
-              .length || 0;
+        const now = Date.now();
+        const onlineCount =
+          game.players?.filter((p) => now - (p.lastSeenAt || 0) < 15000)
+            .length || 0;
 
-          // Send to all connected clients
-          // Never send adminToken via SSE
-          const { adminToken, ...safeGame } = game;
-          const data = JSON.stringify({
-            ...safeGame,
-            onlineCount,
-            event: event.type,
-          });
-          connections.forEach((res) => {
-            res.raw.write(`data: ${data}\n\n`);
-          });
+        // Never send adminToken via SSE
+        const { adminToken, ...safeGame } = game;
+        const data = JSON.stringify({
+          ...safeGame,
+          onlineCount,
+          event: event.type,
+        });
+        connections.forEach((res) => {
+          res.raw.write(`data: ${data}\n\n`);
+        });
 
-          fastify.log.info(
-            `Broadcasted ${event.type} to ${connections.size} clients in game ${gameCode}`,
-          );
-        }
+        fastify.log.info(
+          `Broadcasted ${event.type} to ${connections.size} clients in game ${gameCode}`,
+        );
       }
     }
-  });
-}
-
-// Polling fallback for when Redis pub/sub is not available
-const gamePollingIntervals = new Map(); // gameCode -> intervalId
-
-async function broadcastGameUpdate(gameCode) {
-  const connections = gameConnections.get(gameCode);
-  if (!connections || connections.size === 0) return;
-
-  const gameData = await upstash.get(`game:${gameCode}`);
-  if (gameData) {
-    const game = typeof gameData === "string" ? JSON.parse(gameData) : gameData;
-
-    // Calculate online count
-    const now = Date.now();
-    const onlineCount =
-      game.players?.filter((p) => now - (p.lastSeenAt || 0) < 15000).length ||
-      0;
-
-    // Send to all connected clients
-    // Never send adminToken via SSE
-    const { adminToken, ...safeGame } = game;
-    const data = JSON.stringify({
-      ...safeGame,
-      onlineCount,
-      event: "update",
-    });
-
-    connections.forEach((res) => {
-      res.raw.write(`data: ${data}\n\n`);
-    });
   }
-}
+});
 
 // Health check endpoint
 fastify.get("/health", async (request, reply) => {
@@ -176,10 +123,8 @@ fastify.get("/api/game/events/:code", async (request, reply) => {
     "X-Accel-Buffering": "no",
   });
 
-  // Subscribe to this game's channel (if Redis is available)
-  if (redisAvailable && subClient) {
-    await subClient.subscribe(`game:${code}`);
-  }
+  // Subscribe to this game's channel
+  await subClient.subscribe(`game:${code}`);
 
   // Add this connection to the game's connection set
   if (!gameConnections.has(code)) {
@@ -187,17 +132,10 @@ fastify.get("/api/game/events/:code", async (request, reply) => {
   }
   gameConnections.get(code).add(reply);
 
-  // Start polling if Redis is not available
-  if (!redisAvailable && !gamePollingIntervals.has(code)) {
-    const intervalId = setInterval(() => broadcastGameUpdate(code), 2000);
-    gamePollingIntervals.set(code, intervalId);
-    fastify.log.info(`Started polling for game ${code}`);
-  }
-
   // Send initial game state
-  const gameData = await upstash.get(`game:${code}`);
+  const gameData = await redis.get(`game:${code}`);
   if (gameData) {
-    const game = typeof gameData === "string" ? JSON.parse(gameData) : gameData;
+    const game = JSON.parse(gameData);
     const now = Date.now();
     const onlineCount =
       game.players?.filter((p) => now - (p.lastSeenAt || 0) < 15000).length ||
@@ -224,19 +162,7 @@ fastify.get("/api/game/events/:code", async (request, reply) => {
       connections.delete(reply);
       if (connections.size === 0) {
         gameConnections.delete(code);
-
-        // Unsubscribe from Redis if available
-        if (redisAvailable && subClient) {
-          subClient.unsubscribe(`game:${code}`);
-        }
-
-        // Stop polling if no more connections
-        if (gamePollingIntervals.has(code)) {
-          clearInterval(gamePollingIntervals.get(code));
-          gamePollingIntervals.delete(code);
-          fastify.log.info(`Stopped polling for game ${code}`);
-        }
-
+        subClient.unsubscribe(`game:${code}`);
         fastify.log.info(`No more connections for game ${code}, cleaned up`);
       }
     }
@@ -252,12 +178,8 @@ fastify.post("/api/game/:code", async (request, reply) => {
 
   try {
     // Get existing game for comparison
-    const existingData = await upstash.get(`game:${code}`);
-    const existingGame = existingData
-      ? typeof existingData === "string"
-        ? JSON.parse(existingData)
-        : existingData
-      : null;
+    const existingData = await redis.get(`game:${code}`);
+    const existingGame = existingData ? JSON.parse(existingData) : null;
 
     // Merge players from both client and server to avoid overwrites
     let game = clientGame;
@@ -293,10 +215,13 @@ fastify.post("/api/game/:code", async (request, reply) => {
       };
     }
 
-    // Save to Upstash
-    await upstash.set(`game:${code}`, JSON.stringify(game), {
-      ex: 30 * 24 * 60 * 60, // 30 days TTL
-    });
+    // Save to Redis with 30 day TTL
+    await redis.set(
+      `game:${code}`,
+      JSON.stringify(game),
+      "EX",
+      30 * 24 * 60 * 60,
+    );
 
     // Determine what changed and publish event
     let eventType = "update";
@@ -313,20 +238,14 @@ fastify.post("/api/game/:code", async (request, reply) => {
       }
     }
 
-    // Publish to Redis pub/sub if available - this triggers SSE updates
-    if (redisAvailable && pubClient) {
-      await pubClient.publish(
-        `game:${code}`,
-        JSON.stringify({
-          type: eventType,
-          timestamp: Date.now(),
-        }),
-      );
-    } else {
-      // In polling mode, updates will be picked up automatically
-      // by the polling interval
-      fastify.log.debug(`Game ${code} updated, will be broadcast via polling`);
-    }
+    // Publish to Redis pub/sub - this triggers SSE updates
+    await pubClient.publish(
+      `game:${code}`,
+      JSON.stringify({
+        type: eventType,
+        timestamp: Date.now(),
+      }),
+    );
 
     fastify.log.info(`Game ${code} updated, event: ${eventType}`);
     return { success: true };
@@ -348,14 +267,12 @@ fastify.get("/api/player/:code", async (request, reply) => {
   }
 
   try {
-    const playerData = await upstash.get(`player:${code}:${playerId}`);
+    const playerData = await redis.get(`player:${code}:${playerId}`);
     if (!playerData) {
       return null; // Player doesn't exist yet
     }
 
-    const player =
-      typeof playerData === "string" ? JSON.parse(playerData) : playerData;
-    return player;
+    return JSON.parse(playerData);
   } catch (error) {
     fastify.log.error(error);
     reply.code(500);
@@ -375,10 +292,11 @@ fastify.post("/api/player/:code", async (request, reply) => {
   try {
     const playerId = playerState.playerId || crypto.randomUUID();
 
-    await upstash.set(
+    await redis.set(
       `player:${code}:${playerId}`,
       JSON.stringify({ ...playerState, playerId }),
-      { ex: 7 * 24 * 60 * 60 }, // 7-day TTL
+      "EX",
+      7 * 24 * 60 * 60, // 7-day TTL
     );
 
     return { success: true, playerId };
@@ -395,13 +313,13 @@ fastify.post("/api/player/:code/heartbeat", async (request, reply) => {
   const { playerId } = request.body;
 
   try {
-    const gameData = await upstash.get(`game:${code}`);
+    const gameData = await redis.get(`game:${code}`);
     if (!gameData) {
       reply.code(404);
       return { error: "Game not found" };
     }
 
-    const game = typeof gameData === "string" ? JSON.parse(gameData) : gameData;
+    const game = JSON.parse(gameData);
 
     // Update player's lastSeenAt
     const updatedPlayers =
@@ -412,9 +330,12 @@ fastify.post("/api/player/:code/heartbeat", async (request, reply) => {
     const updatedGame = { ...game, players: updatedPlayers };
 
     // Save and broadcast
-    await upstash.set(`game:${code}`, JSON.stringify(updatedGame), {
-      ex: 7 * 24 * 60 * 60,
-    });
+    await redis.set(
+      `game:${code}`,
+      JSON.stringify(updatedGame),
+      "EX",
+      7 * 24 * 60 * 60,
+    );
 
     await pubClient.publish(
       `game:${code}`,
@@ -439,13 +360,13 @@ fastify.post("/api/game/:code/join", async (request, reply) => {
   const { playerId, displayName } = request.body;
 
   try {
-    const gameData = await upstash.get(`game:${code}`);
+    const gameData = await redis.get(`game:${code}`);
     if (!gameData) {
       reply.code(404);
       return { error: "Game not found" };
     }
 
-    const game = typeof gameData === "string" ? JSON.parse(gameData) : gameData;
+    const game = JSON.parse(gameData);
 
     // Add or update player
     const existingPlayerIndex =
@@ -472,9 +393,12 @@ fastify.post("/api/game/:code/join", async (request, reply) => {
     }
 
     // Save updated game
-    await upstash.set(`game:${code}`, JSON.stringify(game), {
-      ex: 30 * 24 * 60 * 60,
-    });
+    await redis.set(
+      `game:${code}`,
+      JSON.stringify(game),
+      "EX",
+      30 * 24 * 60 * 60,
+    );
 
     // Broadcast player joined event
     await pubClient.publish(
@@ -504,16 +428,14 @@ fastify.post("/api/player/:code/sync", async (request, reply) => {
   try {
     // Update player state in Redis
     if (playerId && itemCounts) {
-      const playerState = await upstash.get(`player:${code}:${playerId}`);
+      const playerState = await redis.get(`player:${code}:${playerId}`);
       if (playerState) {
-        const state =
-          typeof playerState === "string"
-            ? JSON.parse(playerState)
-            : playerState;
-        await upstash.set(
+        const state = JSON.parse(playerState);
+        await redis.set(
           `player:${code}:${playerId}`,
           JSON.stringify({ ...state, itemCounts }),
-          { ex: 7 * 24 * 60 * 60 },
+          "EX",
+          7 * 24 * 60 * 60,
         );
       }
     }
@@ -542,13 +464,13 @@ fastify.get("/api/game/:code", async (request, reply) => {
   const { code } = request.params;
 
   try {
-    const gameData = await upstash.get(`game:${code}`);
+    const gameData = await redis.get(`game:${code}`);
     if (!gameData) {
       reply.code(404);
       return { error: "Game not found" };
     }
 
-    const game = typeof gameData === "string" ? JSON.parse(gameData) : gameData;
+    const game = JSON.parse(gameData);
     // Never send adminToken to clients
     const { adminToken, ...safeGame } = game;
     return safeGame;
@@ -564,13 +486,13 @@ fastify.get("/api/game/:code/player-counts", async (request, reply) => {
   const { code } = request.params;
 
   try {
-    const gameData = await upstash.get(`game:${code}`);
+    const gameData = await redis.get(`game:${code}`);
     if (!gameData) {
       reply.code(404);
       return { error: "Game not found" };
     }
 
-    const game = typeof gameData === "string" ? JSON.parse(gameData) : gameData;
+    const game = JSON.parse(gameData);
 
     // Get all player counts
     const playerCounts = [];
@@ -578,14 +500,11 @@ fastify.get("/api/game/:code/player-counts", async (request, reply) => {
     if (game.players && game.players.length > 0) {
       for (const player of game.players) {
         if (player.id) {
-          const playerStateData = await upstash.get(
+          const playerStateData = await redis.get(
             `player:${code}:${player.id}`,
           );
           if (playerStateData) {
-            const playerState =
-              typeof playerStateData === "string"
-                ? JSON.parse(playerStateData)
-                : playerStateData;
+            const playerState = JSON.parse(playerStateData);
 
             playerCounts.push({
               playerId: player.id,
@@ -618,13 +537,13 @@ fastify.post("/api/game/:code/suggest", async (request, reply) => {
   const { text, suggestedBy } = request.body;
 
   try {
-    const gameData = await upstash.get(`game:${code}`);
+    const gameData = await redis.get(`game:${code}`);
     if (!gameData) {
       reply.code(404);
       return { error: "Game not found" };
     }
 
-    const game = typeof gameData === "string" ? JSON.parse(gameData) : gameData;
+    const game = JSON.parse(gameData);
 
     // Check if game has already started
     if (game.isStarted) {
@@ -648,21 +567,22 @@ fastify.post("/api/game/:code/suggest", async (request, reply) => {
     game.suggestions.push(suggestion);
 
     // Save updated game
-    await upstash.set(`game:${code}`, JSON.stringify(game), {
-      ex: 30 * 24 * 60 * 60,
-    });
+    await redis.set(
+      `game:${code}`,
+      JSON.stringify(game),
+      "EX",
+      30 * 24 * 60 * 60,
+    );
 
-    // Broadcast update via Redis pub/sub or polling
-    if (redisAvailable && pubClient) {
-      await pubClient.publish(
-        `game:${code}`,
-        JSON.stringify({
-          type: "SUGGESTION_ADDED",
-          suggestion,
-          timestamp: Date.now(),
-        }),
-      );
-    }
+    // Broadcast update via Redis pub/sub
+    await pubClient.publish(
+      `game:${code}`,
+      JSON.stringify({
+        type: "SUGGESTION_ADDED",
+        suggestion,
+        timestamp: Date.now(),
+      }),
+    );
 
     return { success: true, suggestion };
   } catch (error) {
@@ -678,13 +598,13 @@ fastify.post("/api/game/:code/start", async (request, reply) => {
   const { adminToken } = request.body;
 
   try {
-    const gameData = await upstash.get(`game:${code}`);
+    const gameData = await redis.get(`game:${code}`);
     if (!gameData) {
       reply.code(404);
       return { error: "Game not found" };
     }
 
-    const game = typeof gameData === "string" ? JSON.parse(gameData) : gameData;
+    const game = JSON.parse(gameData);
 
     // Verify admin token
     if (!adminToken || game.adminToken !== adminToken) {
@@ -708,20 +628,21 @@ fastify.post("/api/game/:code/start", async (request, reply) => {
     game.lastModifiedAt = Date.now();
 
     // Save updated game
-    await upstash.set(`game:${code}`, JSON.stringify(game), {
-      ex: 30 * 24 * 60 * 60,
-    });
+    await redis.set(
+      `game:${code}`,
+      JSON.stringify(game),
+      "EX",
+      30 * 24 * 60 * 60,
+    );
 
     // Broadcast game started event
-    if (redisAvailable && pubClient) {
-      await pubClient.publish(
-        `game:${code}`,
-        JSON.stringify({
-          type: "GAME_STARTED",
-          timestamp: Date.now(),
-        }),
-      );
-    }
+    await pubClient.publish(
+      `game:${code}`,
+      JSON.stringify({
+        type: "GAME_STARTED",
+        timestamp: Date.now(),
+      }),
+    );
 
     fastify.log.info(`Game ${code} started by admin`);
     return { success: true, game };
@@ -738,13 +659,13 @@ fastify.post("/api/game/:code/claim-win", async (request, reply) => {
   const { playerId, markedPositions } = request.body;
 
   try {
-    const gameData = await upstash.get(`game:${code}`);
+    const gameData = await redis.get(`game:${code}`);
     if (!gameData) {
       reply.code(404);
       return { error: "Game not found" };
     }
 
-    const game = typeof gameData === "string" ? JSON.parse(gameData) : gameData;
+    const game = JSON.parse(gameData);
 
     // Check if game already has a winner
     if (game.winner) {
@@ -777,9 +698,12 @@ fastify.post("/api/game/:code/claim-win", async (request, reply) => {
     );
 
     // Save the updated game
-    await upstash.set(`game:${code}`, JSON.stringify(game), {
-      ex: 30 * 24 * 60 * 60,
-    });
+    await redis.set(
+      `game:${code}`,
+      JSON.stringify(game),
+      "EX",
+      30 * 24 * 60 * 60,
+    );
 
     // Broadcast the win event
     await pubClient.publish(
