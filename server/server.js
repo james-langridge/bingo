@@ -40,24 +40,43 @@ if (!process.env.REDIS_URL) {
   process.exit(1);
 }
 
-try {
-  redis = new IORedis(process.env.REDIS_URL, {
-    maxRetriesPerRequest: 3,
-    retryStrategy: (times) => {
-      if (times > 5) {
-        fastify.log.error("Redis connection failed after 5 retries");
-        return null;
+// Retry connection with delays to handle DNS resolution timing (Railway internal networking)
+async function connectWithRetry(maxRetries = 10, delayMs = 2000) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      fastify.log.info(`Redis connection attempt ${attempt}/${maxRetries}...`);
+
+      const client = new IORedis(process.env.REDIS_URL, {
+        maxRetriesPerRequest: 3,
+        lazyConnect: true,
+        retryStrategy: (times) => {
+          if (times > 3) return null;
+          return Math.min(times * 100, 3000);
+        },
+      });
+
+      await client.connect();
+      await client.ping();
+      return client;
+    } catch (error) {
+      fastify.log.warn(
+        `Redis connection attempt ${attempt} failed: ${error.message}`,
+      );
+      if (attempt === maxRetries) {
+        throw error;
       }
-      return Math.min(times * 100, 3000);
-    },
-  });
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+}
+
+try {
+  redis = await connectWithRetry();
 
   // Separate connections for pub/sub (required by Redis)
   pubClient = redis.duplicate();
   subClient = redis.duplicate();
 
-  // Test the connection
-  await redis.ping();
   fastify.log.info("Redis connected successfully");
 } catch (error) {
   fastify.log.error("Failed to connect to Redis:", error.message);
