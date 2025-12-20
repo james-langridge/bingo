@@ -40,39 +40,17 @@ if (!process.env.REDIS_URL) {
   process.exit(1);
 }
 
-// Retry connection with delays to handle DNS resolution timing (Railway internal networking)
-async function connectWithRetry(maxRetries = 10, delayMs = 2000) {
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      fastify.log.info(`Redis connection attempt ${attempt}/${maxRetries}...`);
-
-      const client = new IORedis(process.env.REDIS_URL, {
-        maxRetriesPerRequest: 3,
-        lazyConnect: true,
-        family: 0, // Allow both IPv4 and IPv6 (required for Railway internal networking)
-        retryStrategy: (times) => {
-          if (times > 3) return null;
-          return Math.min(times * 100, 3000);
-        },
-      });
-
-      await client.connect();
-      await client.ping();
-      return client;
-    } catch (error) {
-      fastify.log.warn(
-        `Redis connection attempt ${attempt} failed: ${error.message}`,
-      );
-      if (attempt === maxRetries) {
-        throw error;
-      }
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
-    }
-  }
-}
-
 try {
-  redis = await connectWithRetry();
+  redis = new IORedis(process.env.REDIS_URL, {
+    maxRetriesPerRequest: 3,
+    family: 0, // Allow both IPv4 and IPv6 (required for Railway internal networking)
+    retryStrategy: (times) => {
+      if (times > 3) return null;
+      return Math.min(times * 100, 3000);
+    },
+  });
+
+  await redis.ping();
 
   // Separate connections for pub/sub (required by Redis)
   pubClient = redis.duplicate();
